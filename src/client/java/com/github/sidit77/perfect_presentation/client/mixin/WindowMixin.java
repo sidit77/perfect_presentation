@@ -35,4 +35,13 @@ public class WindowMixin {
         }
     }
 
+    @WrapOperation(
+            method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwCreateWindow(IILjava/lang/CharSequence;JJ)J")
+    )
+    long createInteropSwapChain(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
+        var window = original.call(width, height, title, monitor, share);
+        return window;
+    }
+
 }
