@@ -2,9 +2,11 @@ package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.ContextCreationFlags;
 import com.github.sidit77.perfect_presentation.client.PerfectPresentationClient;
+import com.github.sidit77.perfect_presentation.client.PerfectPresentationNativeLibrary;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
+import org.lwjgl.glfw.GLFWNativeWin32;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -41,7 +43,18 @@ public class WindowMixin {
     )
     long createInteropSwapChain(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
         var window = original.call(width, height, title, monitor, share);
+        //TODO verify that we're on Windows
+        var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
+        PerfectPresentationNativeLibrary.createContextAndSwapChain(window, hwnd);
         return window;
+    }
+
+    @WrapOperation(
+            method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
+    )
+    void proxyMakeCurrent(long window, Operation<Void> original) {
+        PerfectPresentationNativeLibrary.makeContextCurrent(window);
     }
 
 }

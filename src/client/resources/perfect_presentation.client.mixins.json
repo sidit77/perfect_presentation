@@ -4,6 +4,7 @@
   "package": "com.github.sidit77.perfect_presentation.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "RenderSystemMixin",
     "WindowMixin"
   ],
   "injectors": {
