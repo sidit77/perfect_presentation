@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "perfect_presentation",
+  "version": "${version}",
+  "name": "Perfect Presentation",
+  "description": "Improved frame pacing, VRR support, and fullscreen behavior for Windows",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/perfect_presentation/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.github.sidit77.perfect_presentation.client.PerfectPresentationClient"
+    ],
+    "main": [
+      "com.github.sidit77.perfect_presentation.PerfectPresentation"
+    ]
+  },
+  "mixins": [
+    "perfect_presentation.mixins.json",
+    {
+      "config": "perfect_presentation.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}"
+  }
+}
