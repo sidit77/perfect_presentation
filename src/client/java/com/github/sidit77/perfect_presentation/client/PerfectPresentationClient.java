@@ -8,6 +8,6 @@ public class PerfectPresentationClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-
+        System.out.println("2 + 3 = " + PerfectPresentationNativeLibrary.hello_word(2, 3));
     }
 }
