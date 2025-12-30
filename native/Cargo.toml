@@ -1,0 +1,23 @@
+[package]
+name = "perfect_presentation"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+resolver = "3"
+members = [
+    ".",
+    "perfect_presentation_core"
+]
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+perfect_presentation_core = { path = "perfect_presentation_core" }
