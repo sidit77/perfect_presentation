@@ -1,21 +1,25 @@
-use std::ffi::{c_int, c_uint};
-use windows::core::s;
+mod wgl;
+
+use std::ops::Deref;
 use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
+use crate::wgl::{Wgl, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Gdi::{GetDC, HDC};
-use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglGetProcAddress, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
-
-pub const CONTEXT_MAJOR_VERSION_ARB: c_uint = 0x2091;
-pub const CONTEXT_MINOR_VERSION_ARB: c_uint = 0x2092;
-pub const CONTEXT_PROFILE_MASK_ARB: c_uint = 0x9126;
-pub const CONTEXT_CORE_PROFILE_BIT_ARB: c_uint = 0x00000001;
-pub const CONTEXT_FLAGS_ARB: c_uint = 0x2094;
-pub const CONTEXT_FORWARD_COMPATIBLE_BIT_ARB: c_uint = 0x00000002;
+use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
 
 pub struct WglContext {
     dc: HDC,
     rc: HGLRC,
+    pub functions: Wgl
+}
+
+impl Deref for WglContext {
+    type Target = Wgl;
+
+    fn deref(&self) -> &Self::Target {
+        &self.functions
+    }
 }
 
 unsafe impl Send for WglContext {}
@@ -58,22 +62,16 @@ impl WglContext {
             let temp_context = unsafe { wglCreateContext(dc).unwrap() };
             unsafe { wglMakeCurrent(dc, temp_context).unwrap() };
 
-            #[allow(non_snake_case)]
-            let CreateContextAttribsARB: unsafe extern "system" fn(HDC, HGLRC, *const c_int) -> HGLRC = unsafe {
-                wglGetProcAddress(s!("wglCreateContextAttribsARB"))
-                    .map(|fp| std::mem::transmute(fp))
-                    .unwrap()
-            };
+            let wgl = Wgl::from_current_context();
 
             let glrc = unsafe {
-                let t = CreateContextAttribsARB(dc, HGLRC::default(), [
+                wgl.CreateContextAttribsARB(dc, None, &[
                     CONTEXT_MAJOR_VERSION_ARB, 4,
                     CONTEXT_MINOR_VERSION_ARB, 6,
                     CONTEXT_PROFILE_MASK_ARB, CONTEXT_CORE_PROFILE_BIT_ARB,
                     CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
                     0
-                ].as_ptr() as _);
-                (!t.is_invalid()).then_some(t).ok_or_else(|| windows::core::Error::from_thread()).unwrap()
+                ]).unwrap()
             };
 
             unsafe { wglMakeCurrent(dc, HGLRC::default()).unwrap(); }
@@ -81,7 +79,14 @@ impl WglContext {
             glrc
         };
 
-        Self { dc, rc: glrc }
+        let functions = unsafe {
+            wglMakeCurrent(dc, glrc).unwrap();
+            let wgl = Wgl::from_current_context();
+            wglMakeCurrent(dc, HGLRC::default()).unwrap();
+            wgl
+        };
+
+        Self { dc, rc: glrc, functions }
 
     }
 
