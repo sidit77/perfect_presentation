@@ -42,6 +42,7 @@ public class WindowMixin {
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwCreateWindow(IILjava/lang/CharSequence;JJ)J")
     )
     long createInteropSwapChain(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
+        glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
         var window = original.call(width, height, title, monitor, share);
         //TODO verify that we're on Windows
         var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);

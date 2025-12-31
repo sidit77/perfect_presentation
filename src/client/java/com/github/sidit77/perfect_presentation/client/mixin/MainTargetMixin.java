@@ -28,6 +28,25 @@ public class MainTargetMixin extends RenderTarget {
     }
 
     @Override
+    public void bindWrite(boolean bl) {
+        if (!RenderSystem.isOnRenderThread()) {
+            RenderSystem.recordRenderCall(() -> this._bindWrite(bl));
+        } else {
+            this._bindWrite(bl);
+        }
+    }
+
+    @Unique
+    private void _bindWrite(boolean bl) {
+        RenderSystem.assertOnRenderThreadOrInit();
+        GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, this.frameBufferId);
+        if (bl) {
+            GlStateManager._viewport(0, 0, this.viewWidth, this.viewHeight);
+            //GlStateManager._viewport(this.viewWidth, 0, 0, this.viewHeight);
+        }
+    }
+
+    @Override
     public void resize(int i, int j, boolean bl) {
         if (!RenderSystem.isOnRenderThread()) {
             RenderSystem.recordRenderCall(() -> this._resize(i, j, bl));
@@ -46,6 +65,8 @@ public class MainTargetMixin extends RenderTarget {
 
         this.createBuffers(i, j, bl);
         GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //TODO Move into better place
+        PerfectPresentationNativeLibrary.resizeSwapChain(0, this.width, this.height);
     }
 
     @Override
@@ -114,7 +135,20 @@ public class MainTargetMixin extends RenderTarget {
     }
 
     @Override
-    public void blitToScreen(int i, int j, boolean bl) {
-        super.blitToScreen(i, j, bl);
+    public void blitToScreen(int w, int h, boolean noBlend) {
+        RenderSystem.assertOnGameThreadOrInit();
+        if (!RenderSystem.isInInitPhase()) {
+            RenderSystem.recordRenderCall(() -> this._blitToScreen(w, h, noBlend));
+        } else {
+            this._blitToScreen(w, h, noBlend);
+        }
+    }
+
+    @Unique
+    private void _blitToScreen(int w, int h, boolean noBlend) {
+        RenderSystem.assertOnRenderThread();
+        if(w != this.width || h != this.height || !noBlend)
+            System.out.println("Warning: blitToScreen called with incorrect dimensions!");
+        PerfectPresentationNativeLibrary.blitSharedTextureToScreen(this.colorTextureId);
     }
 }

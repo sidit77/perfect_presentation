@@ -2,16 +2,19 @@ mod wgl;
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::iter::once;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
-use windows::Win32::Foundation::HMODULE;
-use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
+use windows::core::w;
+use windows::Win32::Foundation::{FALSE, HMODULE};
+use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, GetClientRect, WINDOW_EX_STYLE, WS_POPUP};
 
 use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLint, GLuint, Wgl, ACCESS_READ_WRITE_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT};
 use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1};
-use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC};
+use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_UNSPECIFIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC};
+use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
 use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, HDC};
 use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, GL_TEXTURE_2D, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
 
@@ -32,7 +35,25 @@ impl Deref for WglContext {
 
 impl WglContext {
 
-    pub fn create(hwnd: HWND) -> Self {
+    pub fn create() -> Self {
+
+        let hwnd = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                w!("Hidden Context Window"),
+                WS_POPUP,
+                0,
+                0,
+                1,
+                1,
+                None,
+                None,
+                None,
+                None
+            ).unwrap()
+        };
+
         let dc = unsafe { GetDC(Some(hwnd)) };
 
         {
@@ -111,6 +132,7 @@ impl Drop for WglContext {
             wglMakeCurrent(self.dc, HGLRC::default()).unwrap();
             wglDeleteContext(self.rc).unwrap();
             ReleaseDC(Some(self.hwnd), self.dc);
+            DestroyWindow(self.hwnd).unwrap();
         }
     }
 }
@@ -124,14 +146,18 @@ pub fn get_window_size(hwnd: isize) -> (i32, i32) {
 
 pub struct InteropContext {
     pub wgl: WglContext,
+    pub dxgi_factory: IDXGIFactory2,
     pub device: ID3D11Device,
     pub device_context: ID3D11DeviceContext,
+    pub swap_chain: IDXGISwapChain1,
     pub interop_handle: DxDeviceHandle
 }
 
 impl InteropContext {
     pub fn new(hwnd: HWND) -> Self {
-        let wgl = WglContext::create(hwnd);
+        let wgl = WglContext::create();
+
+        let dxgi_factory: IDXGIFactory2 = unsafe { CreateDXGIFactory1().unwrap() };
 
         let (device, device_context) = unsafe {
             let mut device = None;
@@ -150,9 +176,47 @@ impl InteropContext {
             (device.unwrap(), device_context.unwrap())
         };
 
+        let swap_chain = unsafe { dxgi_factory.CreateSwapChainForHwnd(
+            &device,
+            hwnd,
+            &DXGI_SWAP_CHAIN_DESC1 {
+                Width: 0,
+                Height: 0,
+                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                Stereo: FALSE,
+                SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                BufferCount: 2,
+                Scaling: DXGI_SCALING_STRETCH,
+                SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
+                AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
+                Flags: 0,
+            },
+            None,
+            None
+        ).unwrap() };
+
         let interop_handle = unsafe { wgl.DXOpenDeviceNV(&device).unwrap() };
 
-        Self { wgl, device, device_context, interop_handle }
+        Self { wgl, dxgi_factory, device, device_context, swap_chain, interop_handle }
+    }
+
+    pub fn present_swap_chain(&self, interval: u32) {
+        unsafe { self.swap_chain.Present(interval, DXGI_PRESENT::default()).unwrap(); }
+    }
+
+    pub fn copy_shared_texture_to_back_buffer(&self, texture: &SharedTexture) {
+        unsafe {
+            SharedTexture::unlock(once(texture));
+            self.device_context.CopyResource(&self.swap_chain.GetBuffer::<ID3D11Texture2D>(0).unwrap(), &texture.texture);
+            SharedTexture::lock(once(texture));
+        }
+    }
+
+    pub fn resize_swap_chain(&self, width: u32, height: u32) {
+        unsafe {
+            self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG::default()).unwrap();
+        }
     }
 
 }

@@ -25,7 +25,9 @@ public class PerfectPresentationNativeLibrary {
                 makeContextCurrent = apiGetFunctionAddress(PP_NATIVE, "make_context_current"),
                 swapBuffers = apiGetFunctionAddress(PP_NATIVE, "swap_buffers"),
                 createSharedTexture = apiGetFunctionAddress(PP_NATIVE, "create_shared_texture"),
-                deleteSharedTexture = apiGetFunctionAddress(PP_NATIVE, "delete_shared_texture");
+                deleteSharedTexture = apiGetFunctionAddress(PP_NATIVE, "delete_shared_texture"),
+                blitSharedTextureToScreen = apiGetFunctionAddress(PP_NATIVE, "blit_shared_texture_to_screen"),
+                resizeSwapChain = apiGetFunctionAddress(PP_NATIVE, "resize_swap_chain");
 
     }
 
@@ -56,6 +58,16 @@ public class PerfectPresentationNativeLibrary {
     public static int deleteSharedTexture(@NativeType("GLuint") int textureId) {
         long __functionAddress = Functions.deleteSharedTexture;
         return JNI.invokeI(textureId, __functionAddress);
+    }
+
+    public static int blitSharedTextureToScreen(@NativeType("GLuint") int textureId) {
+        long __functionAddress = Functions.blitSharedTextureToScreen;
+        return JNI.invokeI(textureId, __functionAddress);
+    }
+
+    public static int resizeSwapChain(@NativeType("GLFWwindow*") long window, int width, int height) {
+        long __functionAddress = Functions.resizeSwapChain;
+        return JNI.invokePI(window, width, height, __functionAddress);
     }
 
 }
