@@ -1,4 +1,4 @@
-use perfect_presentation_core::{WglContext, HWND};
+use perfect_presentation_core::{InteropContext, WglContext, HWND};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -7,13 +7,13 @@ use std::sync::Mutex;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowIdentifier(usize);
 
-static GLFW_WINDOWS: Mutex<BTreeMap<WindowIdentifier, WglContext>> = Mutex::new(BTreeMap::new());
+static GLFW_WINDOWS: Mutex<BTreeMap<WindowIdentifier, InteropContext>> = Mutex::new(BTreeMap::new());
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn create_context_and_swap_chain(window: WindowIdentifier, hwnd: HWND) -> i32 {
     println!("create_context_and_swap_chain: {:?}", window);
 
-    let context = WglContext::create(hwnd);
+    let context = InteropContext::new(hwnd);
     GLFW_WINDOWS.lock().unwrap().insert(window, context);
     0
 }
@@ -22,7 +22,7 @@ pub unsafe extern "C" fn create_context_and_swap_chain(window: WindowIdentifier,
 pub unsafe extern "C" fn make_context_current(window: WindowIdentifier) -> i32 {
     println!("make_context_current: {:?}", window);
 
-    GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().make_current();
+    GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().wgl.make_current();
     0
 }
 
@@ -30,7 +30,7 @@ pub unsafe extern "C" fn make_context_current(window: WindowIdentifier) -> i32 {
 pub unsafe extern "C" fn swap_buffers(window: WindowIdentifier) -> i32 {
     //println!("swap_buffers: {:?}", window);
 
-    GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().swap_buffers();
+    GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().wgl.swap_buffers();
     0
 }
 

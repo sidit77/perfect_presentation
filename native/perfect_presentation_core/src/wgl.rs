@@ -6,9 +6,9 @@ use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Graphics::Gdi::HDC;
 use windows::Win32::Graphics::OpenGL::{wglGetProcAddress, HGLRC};
 
-type GLenum = c_uint;
-type GLuint = c_uint;
-type GLint = c_int;
+pub type GLenum = c_uint;
+pub type GLuint = c_uint;
+pub type GLint = c_int;
 
 pub const CONTEXT_MAJOR_VERSION_ARB: GLenum = 0x2091;
 pub const CONTEXT_MINOR_VERSION_ARB: GLenum = 0x2092;
@@ -22,8 +22,8 @@ pub const ACCESS_READ_WRITE_NV: GLenum = 0x00000001;
 pub const ACCESS_WRITE_DISCARD_NV: GLenum = 0x00000002;
 
 //TODO make a special DxDeviceHandle
-type DxDeviceHandle = HANDLE;
-type DxResourceHandle = HANDLE;
+pub type DxDeviceHandle = HANDLE;
+pub type DxResourceHandle = HANDLE;
 
 pub struct Wgl {
     CreateContextAttribsARB: unsafe extern "system" fn(HDC, HGLRC, *const c_int) -> HGLRC,
