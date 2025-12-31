@@ -23,7 +23,9 @@ public class PerfectPresentationNativeLibrary {
         public static final long
                 createContextAndSwapChain = apiGetFunctionAddress(PP_NATIVE, "create_context_and_swap_chain"),
                 makeContextCurrent = apiGetFunctionAddress(PP_NATIVE, "make_context_current"),
-                swapBuffers = apiGetFunctionAddress(PP_NATIVE, "swap_buffers");
+                swapBuffers = apiGetFunctionAddress(PP_NATIVE, "swap_buffers"),
+                createSharedTexture = apiGetFunctionAddress(PP_NATIVE, "create_shared_texture"),
+                deleteSharedTexture = apiGetFunctionAddress(PP_NATIVE, "delete_shared_texture");
 
     }
 
@@ -40,6 +42,20 @@ public class PerfectPresentationNativeLibrary {
     public static int swapBuffers(@NativeType("GLFWwindow*") long window) {
         long __functionAddress = Functions.swapBuffers;
         return JNI.invokePI(window, __functionAddress);
+    }
+
+    public static int createSharedTexture(
+            @NativeType("GLuint") int textureId,
+            int width,
+            int height
+    ) {
+        long __functionAddress = Functions.createSharedTexture;
+        return JNI.invokeI(textureId, width, height, __functionAddress);
+    }
+
+    public static int deleteSharedTexture(@NativeType("GLuint") int textureId) {
+        long __functionAddress = Functions.deleteSharedTexture;
+        return JNI.invokeI(textureId, __functionAddress);
     }
 
 }

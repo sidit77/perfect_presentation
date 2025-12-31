@@ -1,5 +1,6 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
+import com.github.sidit77.perfect_presentation.client.PerfectPresentationNativeLibrary;
 import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
@@ -58,6 +59,7 @@ public class MainTargetMixin extends RenderTarget {
         }
 
         if (this.colorTextureId > -1) {
+            PerfectPresentationNativeLibrary.deleteSharedTexture(this.colorTextureId);
             TextureUtil.releaseTextureId(this.colorTextureId);
             this.colorTextureId = -1;
         }
@@ -70,14 +72,14 @@ public class MainTargetMixin extends RenderTarget {
     }
 
     @Override
-    public void createBuffers(int i, int j, boolean bl) {
+    public void createBuffers(int w, int h, boolean clear) {
         RenderSystem.assertOnRenderThreadOrInit();
         int k = RenderSystem.maxSupportedTextureSize();
-        if (i > 0 && i <= k && j > 0 && j <= k) {
-            this.viewWidth = i;
-            this.viewHeight = j;
-            this.width = i;
-            this.height = j;
+        if (w > 0 && w <= k && h > 0 && h <= k) {
+            this.viewWidth = w;
+            this.viewHeight = h;
+            this.width = w;
+            this.height = h;
             this.frameBufferId = GlStateManager.glGenFramebuffers();
             this.colorTextureId = TextureUtil.generateTextureId();
             if (this.useDepth) {
@@ -95,7 +97,8 @@ public class MainTargetMixin extends RenderTarget {
             GlStateManager._bindTexture(this.colorTextureId);
             GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            GlStateManager._texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this.width, this.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+            //GlStateManager._texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this.width, this.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+            PerfectPresentationNativeLibrary.createSharedTexture(this.colorTextureId, this.width, this.height);
             GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, this.frameBufferId);
             GlStateManager._glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this.colorTextureId, 0);
             if (this.useDepth) {
@@ -103,10 +106,10 @@ public class MainTargetMixin extends RenderTarget {
             }
 
             this.checkStatus();
-            this.clear(bl);
+            this.clear(clear);
             this.unbindRead();
         } else {
-            throw new IllegalArgumentException("Window " + i + "x" + j + " size out of bounds (max. size: " + k + ")");
+            throw new IllegalArgumentException("Window " + w + "x" + h + " size out of bounds (max. size: " + k + ")");
         }
     }
 

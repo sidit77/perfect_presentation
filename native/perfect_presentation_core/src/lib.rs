@@ -7,13 +7,13 @@ use std::sync::{Arc, Weak};
 use windows::Win32::Foundation::HMODULE;
 use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
-use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLuint, Wgl, ACCESS_READ_WRITE_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
+use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLint, GLuint, Wgl, ACCESS_READ_WRITE_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT};
 use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1};
-use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC};
+use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC};
 use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, HDC};
-use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
+use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, GL_TEXTURE_2D, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
 
 pub struct WglContext {
     hwnd: HWND,
@@ -126,8 +126,7 @@ pub struct InteropContext {
     pub wgl: WglContext,
     pub device: ID3D11Device,
     pub device_context: ID3D11DeviceContext,
-    pub interop_handle: DxDeviceHandle,
-    pub shared_textures: BTreeMap<GLuint, SharedTexture>
+    pub interop_handle: DxDeviceHandle
 }
 
 impl InteropContext {
@@ -153,11 +152,45 @@ impl InteropContext {
 
         let interop_handle = unsafe { wgl.DXOpenDeviceNV(&device).unwrap() };
 
-        Self { wgl, device, device_context, interop_handle, shared_textures: Default::default() }
+        Self { wgl, device, device_context, interop_handle }
     }
 
-    pub fn create_shared_texture(&mut self, gl_ident: GLuint) -> &SharedTexture {
-        todo!()
+}
+
+impl Drop for InteropContext {
+    fn drop(&mut self) {
+        unsafe { self.wgl.functions.DXCloseDeviceNV(self.interop_handle).unwrap(); }
+        self.interop_handle = Default::default();
+    }
+}
+
+unsafe impl Send for InteropContext {}
+unsafe impl Sync for InteropContext {}
+
+pub struct InteropState {
+    pub context: Arc<InteropContext>,
+    shared_textures: BTreeMap<GLuint, SharedTexture>
+}
+
+impl Deref for InteropState {
+    type Target = InteropContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.context
+    }
+}
+
+impl InteropState {
+
+    pub fn new(hwnd: HWND) -> Self {
+        Self { context: Arc::new(InteropContext::new(hwnd)), shared_textures: Default::default() }
+    }
+
+    pub fn create_shared_texture(&mut self, gl_ident: GLuint, width: u32, height: u32) -> &SharedTexture {
+        let shared_texture = SharedTexture::new(&self.context, gl_ident, GL_TEXTURE_2D, RGBA8, width, height);
+        let old = self.shared_textures.insert(gl_ident, shared_texture);
+        assert!(old.is_none(), "A shared texture with the same gl_ident already exists");
+        self.get_shared_texture(gl_ident)
     }
 
     pub fn get_shared_texture(&self, gl_ident: GLuint) -> &SharedTexture {
@@ -170,18 +203,14 @@ impl InteropContext {
 
 }
 
-impl Drop for InteropContext {
+impl Drop for InteropState {
     fn drop(&mut self) {
-        unsafe { self.device_context.ClearState(); }
+        unsafe { self.context.device_context.ClearState(); }
         SharedTexture::unlock(self.shared_textures.values());
         self.shared_textures.clear();
-        unsafe { self.wgl.functions.DXCloseDeviceNV(self.interop_handle).unwrap(); }
-        self.interop_handle = Default::default();
+        assert_eq!(Arc::strong_count(&self.context), 1, "InteropContext leaked");
     }
 }
-
-unsafe impl Send for InteropContext {}
-unsafe impl Sync for InteropContext {}
 
 pub struct SharedTexture {
     context: Weak<InteropContext>,
@@ -190,9 +219,15 @@ pub struct SharedTexture {
     locked: Cell<bool>
 }
 
+unsafe impl Send for SharedTexture {}
+unsafe impl Sync for SharedTexture {}
+
+pub const RENDERBUFFER: GLenum = 0x8D41;
+pub const RGBA8: GLenum = 0x8058;
+
 impl SharedTexture {
 
-    fn new(context: &Arc<InteropContext>, gl_ident: GLuint, width: u32, height: u32) -> Self {
+    fn new(context: &Arc<InteropContext>, gl_ident: GLuint, gl_type: GLenum, format: GLenum, width: u32, height: u32) -> Self {
         let texture = unsafe {
             let mut temp = None;
             context.device.CreateTexture2D(&D3D11_TEXTURE2D_DESC {
@@ -200,7 +235,10 @@ impl SharedTexture {
                 Height: height,
                 MipLevels: 1,
                 ArraySize: 1,
-                Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                Format: match format {
+                    RGBA8 => DXGI_FORMAT_R8G8B8A8_UNORM,
+                    _ => panic!("Unsupported format")
+                },
                 SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
                 Usage: D3D11_USAGE_DEFAULT,
                 BindFlags: D3D11_BIND_RENDER_TARGET.0 as _,
@@ -211,8 +249,7 @@ impl SharedTexture {
         };
 
         let interop_handle = unsafe {
-            pub const RENDERBUFFER: GLenum = 0x8D41;
-            context.wgl.DXRegisterObjectNV(context.interop_handle, &texture, gl_ident, RENDERBUFFER, ACCESS_READ_WRITE_NV).unwrap()
+            context.wgl.DXRegisterObjectNV(context.interop_handle, &texture, gl_ident, gl_type, ACCESS_READ_WRITE_NV).unwrap()
         };
 
         Self {

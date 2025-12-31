@@ -1,5 +1,7 @@
-use perfect_presentation_core::{InteropContext, WglContext, HWND};
+use std::cell::Cell;
+use perfect_presentation_core::{InteropContext, InteropState, SharedTexture, WglContext, HWND};
 use std::collections::BTreeMap;
+use std::iter::once;
 use std::sync::Mutex;
 
 
@@ -7,13 +9,17 @@ use std::sync::Mutex;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowIdentifier(usize);
 
-static GLFW_WINDOWS: Mutex<BTreeMap<WindowIdentifier, InteropContext>> = Mutex::new(BTreeMap::new());
+static GLFW_WINDOWS: Mutex<BTreeMap<WindowIdentifier, InteropState>> = Mutex::new(BTreeMap::new());
+
+thread_local! {
+    static CURRENT_CONTEXT: Cell<Option<WindowIdentifier>> = Cell::new(None);
+}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn create_context_and_swap_chain(window: WindowIdentifier, hwnd: HWND) -> i32 {
     println!("create_context_and_swap_chain: {:?}", window);
 
-    let context = InteropContext::new(hwnd);
+    let context = InteropState::new(hwnd);
     GLFW_WINDOWS.lock().unwrap().insert(window, context);
     0
 }
@@ -23,6 +29,7 @@ pub unsafe extern "C" fn make_context_current(window: WindowIdentifier) -> i32 {
     println!("make_context_current: {:?}", window);
 
     GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().wgl.make_current();
+    CURRENT_CONTEXT.with(|cell| cell.set(Some(window)));
     0
 }
 
@@ -31,6 +38,24 @@ pub unsafe extern "C" fn swap_buffers(window: WindowIdentifier) -> i32 {
     //println!("swap_buffers: {:?}", window);
 
     GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().wgl.swap_buffers();
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn create_shared_texture(gl_ident: i32, width: i32, height: i32) -> i32 {
+    let window = CURRENT_CONTEXT.with(|cell| cell.get().expect("No current context"));
+    let mut lock = GLFW_WINDOWS.lock().unwrap();
+    let context = lock.get_mut(&window).unwrap();
+    let tex = context.create_shared_texture(gl_ident as _, width as _, height as _);
+    SharedTexture::lock(once(tex));
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn delete_shared_texture(gl_ident: i32) -> i32 {
+    //println!("swap_buffers: {:?}", window);
+    let window = CURRENT_CONTEXT.with(|cell| cell.get().expect("No current context"));
+    GLFW_WINDOWS.lock().unwrap().get_mut(&window).unwrap().delete_shared_texture(gl_ident as _);
     0
 }
 
