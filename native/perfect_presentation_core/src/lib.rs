@@ -4,15 +4,18 @@ use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::iter::once;
 use std::ops::Deref;
+use std::slice::from_raw_parts;
 use std::sync::{Arc, Weak};
-use windows::core::w;
+use crossbeam_utils::atomic::AtomicCell;
+use windows::core::{s, w};
 use windows::Win32::Foundation::{FALSE, HMODULE};
 use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, GetClientRect, WINDOW_EX_STYLE, WS_POPUP};
 
 use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLint, GLuint, Wgl, ACCESS_READ_WRITE_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT};
-use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1};
+use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView, ID3D11ShaderResourceView, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_CULL_NONE, D3D11_FILL_SOLID, D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_RASTERIZER_DESC, D3D11_SAMPLER_DESC, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_USAGE_DEFAULT, D3D11_VIEWPORT};
+use windows::Win32::Graphics::Direct3D::{D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1, D3D_SHADER_MACRO};
+use windows::Win32::Graphics::Direct3D::Fxc::D3DCompile;
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_UNSPECIFIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC};
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
 use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, HDC};
@@ -144,13 +147,17 @@ pub fn get_window_size(hwnd: isize) -> (i32, i32) {
     (rect.right - rect.left, rect.bottom - rect.top)
 }
 
+const _: () = assert!(AtomicCell::<Option<ID3D11RenderTargetView>>::is_lock_free());
+
 pub struct InteropContext {
     pub wgl: WglContext,
     pub dxgi_factory: IDXGIFactory2,
     pub device: ID3D11Device,
     pub device_context: ID3D11DeviceContext,
     pub swap_chain: IDXGISwapChain1,
-    pub interop_handle: DxDeviceHandle
+    pub interop_handle: DxDeviceHandle,
+
+    cached_render_target_view: AtomicCell<Option<ID3D11RenderTargetView>>,
 }
 
 impl InteropContext {
@@ -198,7 +205,51 @@ impl InteropContext {
 
         let interop_handle = unsafe { wgl.DXOpenDeviceNV(&device).unwrap() };
 
-        Self { wgl, dxgi_factory, device, device_context, swap_chain, interop_handle }
+        let shader_source = include_bytes!("blit_shader.hlsl");
+        let vertex_shader_blob = make_resource(|r| unsafe {
+            D3DCompile(shader_source.as_ptr() as _, shader_source.len(), s!("blit_shader.hlsl"), None, None, s!("VsMain"), s!("vs_5_0"), 0, 0, r.unwrap(), None)
+        });
+        let vertex_shader = make_resource(|r| unsafe {
+            device.CreateVertexShader(from_raw_parts(vertex_shader_blob.GetBufferPointer() as _, vertex_shader_blob.GetBufferSize()), None, r)
+        });
+
+        let pixel_shader_blob = make_resource(|r| unsafe {
+            D3DCompile(shader_source.as_ptr() as _, shader_source.len(), s!("blit_shader.hlsl"), None, None, s!("PsMain"), s!("ps_5_0"), 0, 0, r.unwrap(), None)
+        });
+        let pixel_shader = make_resource(|r| unsafe {
+            device.CreatePixelShader(from_raw_parts(pixel_shader_blob.GetBufferPointer() as _, pixel_shader_blob.GetBufferSize()), None, r)
+        });
+
+        let rasterizer_state = make_resource(|r| unsafe {
+            device.CreateRasterizerState(&D3D11_RASTERIZER_DESC {
+                FillMode: D3D11_FILL_SOLID,
+                CullMode: D3D11_CULL_NONE,
+                ..Default::default()
+            }, r)
+        });
+
+        let sampler_state = make_resource(|r| unsafe {
+            device.CreateSamplerState(&D3D11_SAMPLER_DESC {
+                Filter: D3D11_FILTER_MIN_MAG_MIP_POINT,
+                AddressU: D3D11_TEXTURE_ADDRESS_WRAP,
+                AddressV: D3D11_TEXTURE_ADDRESS_WRAP,
+                AddressW: D3D11_TEXTURE_ADDRESS_WRAP,
+                ..Default::default()
+            }, r)
+        });
+
+        unsafe {
+            device_context.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            device_context.VSSetShader(&vertex_shader, None);
+
+            device_context.RSSetState(&rasterizer_state);
+
+            device_context.PSSetShader(&pixel_shader, None);
+            device_context.PSSetSamplers(0, Some(&[Some(sampler_state)]));
+        }
+
+        Self { wgl, dxgi_factory, device, device_context, swap_chain, interop_handle, cached_render_target_view: AtomicCell::new(None) }
     }
 
     pub fn present_swap_chain(&self, interval: u32) {
@@ -206,14 +257,32 @@ impl InteropContext {
     }
 
     pub fn copy_shared_texture_to_back_buffer(&self, texture: &SharedTexture) {
+        SharedTexture::unlock(once(texture));
+        let rtv = self.cached_render_target_view.take().unwrap_or_else(|| make_resource(|r| unsafe {
+            let framebuffer = self.swap_chain.GetBuffer::<ID3D11Texture2D>(0).unwrap();
+            self.device.CreateRenderTargetView(&framebuffer, None, r)
+        }));
+        self.cached_render_target_view.store(Some(rtv.clone()));
         unsafe {
-            SharedTexture::unlock(once(texture));
-            self.device_context.CopyResource(&self.swap_chain.GetBuffer::<ID3D11Texture2D>(0).unwrap(), &texture.texture);
-            SharedTexture::lock(once(texture));
+            let desc = self.swap_chain.GetDesc1().unwrap();
+            self.device_context.RSSetViewports(Some(&[D3D11_VIEWPORT {
+                Width: desc.Width as f32,
+                Height: desc.Height as f32,
+                MaxDepth: 1.0,
+                ..Default::default()
+            }]));
+
+            self.device_context.PSSetShaderResources(0, Some(&[Some(texture.texture_view.clone())]));
+            self.device_context.OMSetRenderTargets(Some(&[Some(rtv)]), None);
+            self.device_context.Draw(3, 0);
+            //self.device_context.CopyResource(&self.swap_chain.GetBuffer::<ID3D11Texture2D>(0).unwrap(), &texture.texture);
+
         }
+        SharedTexture::lock(once(texture));
     }
 
     pub fn resize_swap_chain(&self, width: u32, height: u32) {
+        self.cached_render_target_view.take();
         unsafe {
             self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG::default()).unwrap();
         }
@@ -278,7 +347,7 @@ impl Drop for InteropState {
 
 pub struct SharedTexture {
     context: Weak<InteropContext>,
-    texture: ID3D11Texture2D,
+    texture_view: ID3D11ShaderResourceView,
     interop_handle: DxResourceHandle,
     locked: Cell<bool>
 }
@@ -292,8 +361,8 @@ pub const RGBA8: GLenum = 0x8058;
 impl SharedTexture {
 
     fn new(context: &Arc<InteropContext>, gl_ident: GLuint, gl_type: GLenum, format: GLenum, width: u32, height: u32) -> Self {
-        let texture = unsafe {
-            let mut temp = None;
+
+        let texture = make_resource(|r| unsafe {
             context.device.CreateTexture2D(&D3D11_TEXTURE2D_DESC {
                 Width: width,
                 Height: height,
@@ -305,12 +374,15 @@ impl SharedTexture {
                 },
                 SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
                 Usage: D3D11_USAGE_DEFAULT,
-                BindFlags: D3D11_BIND_RENDER_TARGET.0 as _,
+                BindFlags: (D3D11_BIND_RENDER_TARGET.0 | D3D11_BIND_SHADER_RESOURCE.0) as _,
                 CPUAccessFlags: 0,
                 MiscFlags: 0,
-            }, None, Some(&mut temp)).unwrap();
-            temp.unwrap()
-        };
+            }, None, r)
+        });
+
+        let texture_view = make_resource(|r| unsafe {
+            context.device.CreateShaderResourceView(&texture, None, r)
+        });
 
         let interop_handle = unsafe {
             context.wgl.DXRegisterObjectNV(context.interop_handle, &texture, gl_ident, gl_type, ACCESS_READ_WRITE_NV).unwrap()
@@ -318,7 +390,7 @@ impl SharedTexture {
 
         Self {
             context: Arc::downgrade(context),
-            texture,
+            texture_view,
             interop_handle,
             locked: Cell::new(false),
         }
@@ -370,4 +442,12 @@ impl Drop for SharedTexture {
             context.wgl.functions.DXUnregisterObjectNV(context.interop_handle, self.interop_handle).unwrap();
         }
     }
+}
+
+#[track_caller]
+fn make_resource<T>(func: impl FnOnce(Option<*mut Option<T>>) -> windows::core::Result<()>) -> T {
+    let mut obj = None;
+    func(Some(&mut obj))
+        .expect("Resource creation failed");
+    obj.expect("Returned resource is null")
 }
