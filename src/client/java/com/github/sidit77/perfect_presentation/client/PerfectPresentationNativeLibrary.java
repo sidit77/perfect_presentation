@@ -22,6 +22,7 @@ public class PerfectPresentationNativeLibrary {
 
         public static final long
                 createContextAndSwapChain = apiGetFunctionAddress(PP_NATIVE, "create_context_and_swap_chain"),
+                destroyContext = apiGetFunctionAddress(PP_NATIVE, "destroy_context"),
                 makeContextCurrent = apiGetFunctionAddress(PP_NATIVE, "make_context_current"),
                 swapBuffers = apiGetFunctionAddress(PP_NATIVE, "swap_buffers"),
                 setSwapInterval = apiGetFunctionAddress(PP_NATIVE, "set_swap_interval"),
@@ -74,6 +75,11 @@ public class PerfectPresentationNativeLibrary {
     public static int resizeSwapChain(@NativeType("GLFWwindow*") long window, int width, int height) {
         long __functionAddress = Functions.resizeSwapChain;
         return JNI.invokePI(window, width, height, __functionAddress);
+    }
+
+    public static int destroyContext(@NativeType("GLFWwindow*") long window) {
+        long __functionAddress = Functions.destroyContext;
+        return JNI.invokePI(window, __functionAddress);
     }
 
 }

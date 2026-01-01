@@ -81,8 +81,13 @@ public class WindowMixin {
     }
 
     @Inject(method = "setMode", at = @At(value = "INVOKE", ordinal = 1, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
-    void reenable_window_border(CallbackInfo ci) {
+    void re_enable_window_border(CallbackInfo ci) {
         glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
+    }
+
+    @Inject(method = "close", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwDestroyWindow(J)V"))
+    void destroyInteropContext(CallbackInfo ci) {
+        PerfectPresentationNativeLibrary.destroyContext(window);
     }
 
 }

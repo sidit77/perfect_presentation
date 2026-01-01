@@ -6,7 +6,6 @@ public class PerfectPresentationClient implements ClientModInitializer {
 
     /*
     TODO:
-        - Wrap glfwDestroyWindow call and also destroy to external context
         - Forward the context creation flags to external context creation
         - Better error handling on the native side
         - Improve the whole JNI setup

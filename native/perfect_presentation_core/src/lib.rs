@@ -166,6 +166,9 @@ impl InteropContext {
 
         let dxgi_factory: IDXGIFactory2 = unsafe { CreateDXGIFactory1().unwrap() };
 
+        let debug_layer = cfg!(debug_assertions)
+            .then_some(D3D11_CREATE_DEVICE_DEBUG)
+            .unwrap_or_default();
         let (device, device_context) = unsafe {
             let mut device = None;
             let mut device_context = None;
@@ -173,8 +176,8 @@ impl InteropContext {
                 None,
                 D3D_DRIVER_TYPE_HARDWARE,
                 HMODULE::default(),
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_DEBUG, //TODO Add debug flag for debug builds?
-                Some(&[D3D_FEATURE_LEVEL_11_1]),
+                D3D11_CREATE_DEVICE_BGRA_SUPPORT | debug_layer,
+                None,
                 D3D11_SDK_VERSION,
                 Some(&mut device),
                 None,
