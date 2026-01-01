@@ -1,0 +1,8 @@
+plugins {
+    id "io.github.arc-blroth.cargo-wrapper" version "1.2.0"
+}
+
+cargo {
+    crate = projectDir.path
+    outputs = ['': 'perfect_presentation.dll']
+}

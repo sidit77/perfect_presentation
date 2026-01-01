@@ -21,6 +21,12 @@ loom {
     }
 }
 
+configurations {
+    natives {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
 
 repositories {
     // Add repositories to retrieve artifacts from in here.
@@ -31,6 +37,8 @@ repositories {
 }
 
 dependencies {
+    natives project(":native")
+
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
@@ -39,6 +47,8 @@ dependencies {
 }
 
 processResources {
+    from(configurations.natives)
+
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
     inputs.property "loader_version", project.loader_version

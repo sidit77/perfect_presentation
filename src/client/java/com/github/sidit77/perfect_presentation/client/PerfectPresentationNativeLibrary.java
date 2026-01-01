@@ -10,9 +10,7 @@ import static org.lwjgl.system.APIUtil.apiGetFunctionAddress;
 public class PerfectPresentationNativeLibrary {
 
     private static final SharedLibrary PP_NATIVE = Library.loadNative(
-            PerfectPresentationNativeLibrary.class,
-            "",
-            System.getenv("PERFECT_PRESENTATION_NATIVE_LIB")
+            PerfectPresentationNativeLibrary.class, "", "perfect_presentation"
     );
 
     public static final class Functions {
