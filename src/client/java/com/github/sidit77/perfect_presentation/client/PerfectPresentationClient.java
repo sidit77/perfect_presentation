@@ -7,10 +7,10 @@ public class PerfectPresentationClient implements ClientModInitializer {
     /*
     TODO:
         - Wrap glfwDestroyWindow call and also destroy to external context
-        - Resize the swapchain in the correct location
         - Forward the context creation flags to external context creation
         - Better error handling on the native side
         - Improve the whole JNI setup
+        - Waitable swap chain?
      */
 
     public static ContextCreationFlags contextCreationFlags = new ContextCreationFlags();

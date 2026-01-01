@@ -81,8 +81,7 @@ pub unsafe extern "C" fn blit_shared_texture_to_screen(gl_ident: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn resize_swap_chain(_window: WindowIdentifier, width: i32, height: i32) -> i32 {
-    let window = CURRENT_CONTEXT.with(|cell| cell.get().expect("No current context"));
+pub unsafe extern "C" fn resize_swap_chain(window: WindowIdentifier, width: i32, height: i32) -> i32 {
     let lock = GLFW_WINDOWS.lock().unwrap();
     let context = lock.get(&window).unwrap();
     context.resize_swap_chain(width as u32, height as u32);

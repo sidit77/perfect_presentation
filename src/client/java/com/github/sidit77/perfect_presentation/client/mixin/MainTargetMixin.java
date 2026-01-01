@@ -65,8 +65,6 @@ public class MainTargetMixin extends RenderTarget {
 
         this.createBuffers(i, j, bl);
         GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        //TODO Move into better place
-        PerfectPresentationNativeLibrary.resizeSwapChain(0, this.width, this.height);
     }
 
     @Override
