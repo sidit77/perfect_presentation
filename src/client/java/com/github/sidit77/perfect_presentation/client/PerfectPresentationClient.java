@@ -10,7 +10,6 @@ public class PerfectPresentationClient implements ClientModInitializer {
         - Resize the swapchain in the correct location
         - Forward the context creation flags to external context creation
         - Better error handling on the native side
-        - Fix the forced always-on-top for the fullscreen mode
         - Improve the whole JNI setup
      */
 

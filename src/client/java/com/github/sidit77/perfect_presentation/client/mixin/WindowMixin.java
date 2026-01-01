@@ -11,6 +11,8 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -49,7 +51,7 @@ public class WindowMixin {
     )
     long createInteropSwapChain(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
         glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
-        var window = original.call(width, height, title, monitor, share);
+        var window = original.call(width, height, title, 0L, share);
         //TODO verify that we're on Windows
         var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
         PerfectPresentationNativeLibrary.createContextAndSwapChain(window, hwnd);
@@ -70,6 +72,17 @@ public class WindowMixin {
     )
     void proxySwapInterval(int interval, Operation<Void> original) {
         PerfectPresentationNativeLibrary.setSwapInterval(window, interval);
+    }
+
+    @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
+    void replace_fullscreen_with_borderless_window(long window, long monitor, int xpos, int ypos, int width, int height, int refreshRate, Operation<Void> original) {
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+        original.call(window, 0L, xpos, ypos, width, height, -1);
+    }
+
+    @Inject(method = "setMode", at = @At(value = "INVOKE", ordinal = 1, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
+    void reenable_window_border(CallbackInfo ci) {
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
     }
 
 }
