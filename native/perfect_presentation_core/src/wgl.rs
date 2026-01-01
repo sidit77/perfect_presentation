@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, dead_code)]
 
 use std::ffi::{c_int, c_uint, c_void};
 use windows::core::{s, Error, IUnknown, Param, BOOL};

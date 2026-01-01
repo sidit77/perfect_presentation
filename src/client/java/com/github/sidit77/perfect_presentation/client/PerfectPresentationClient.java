@@ -7,7 +7,6 @@ public class PerfectPresentationClient implements ClientModInitializer {
     /*
     TODO:
         - Wrap glfwDestroyWindow call and also destroy to external context
-        - Wrap the glfwSetSwapInterval call
         - Resize the swapchain in the correct location
         - Forward the context creation flags to external context creation
         - Better error handling on the native side

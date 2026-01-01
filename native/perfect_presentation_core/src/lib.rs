@@ -1,23 +1,23 @@
 mod wgl;
 
+use crossbeam_utils::atomic::AtomicCell;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::iter::once;
 use std::ops::Deref;
 use std::slice::from_raw_parts;
 use std::sync::{Arc, Weak};
-use crossbeam_utils::atomic::AtomicCell;
 use windows::core::{s, w};
 use windows::Win32::Foundation::{FALSE, HMODULE};
 use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, GetClientRect, WINDOW_EX_STYLE, WS_POPUP};
 
-use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLint, GLuint, Wgl, ACCESS_READ_WRITE_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
+use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLuint, Wgl, ACCESS_WRITE_DISCARD_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView, ID3D11ShaderResourceView, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_CULL_NONE, D3D11_FILL_SOLID, D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_RASTERIZER_DESC, D3D11_SAMPLER_DESC, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_USAGE_DEFAULT, D3D11_VIEWPORT};
-use windows::Win32::Graphics::Direct3D::{D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1, D3D_SHADER_MACRO};
 use windows::Win32::Graphics::Direct3D::Fxc::D3DCompile;
+use windows::Win32::Graphics::Direct3D::{D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_1};
+use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView, ID3D11ShaderResourceView, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_CULL_NONE, D3D11_FILL_SOLID, D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_RASTERIZER_DESC, D3D11_SAMPLER_DESC, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_USAGE_DEFAULT, D3D11_VIEWPORT};
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_UNSPECIFIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC};
-use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
+use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_PRESENT_ALLOW_TEARING, DXGI_SCALING_NONE, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
 use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, HDC};
 use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, GL_TEXTURE_2D, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
 
@@ -189,15 +189,15 @@ impl InteropContext {
             &DXGI_SWAP_CHAIN_DESC1 {
                 Width: 0,
                 Height: 0,
-                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                Format: DXGI_FORMAT_B8G8R8A8_UNORM,
                 Stereo: FALSE,
                 SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
                 BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
                 BufferCount: 2,
-                Scaling: DXGI_SCALING_STRETCH,
+                Scaling: DXGI_SCALING_NONE,
                 SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
                 AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
-                Flags: 0,
+                Flags: DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as _,
             },
             None,
             None
@@ -253,7 +253,8 @@ impl InteropContext {
     }
 
     pub fn present_swap_chain(&self, interval: u32) {
-        unsafe { self.swap_chain.Present(interval, DXGI_PRESENT::default()).unwrap(); }
+        let flags = (interval == 0).then_some(DXGI_PRESENT_ALLOW_TEARING).unwrap_or_default();
+        unsafe { self.swap_chain.Present(interval, flags).unwrap(); }
     }
 
     pub fn copy_shared_texture_to_back_buffer(&self, texture: &SharedTexture) {
@@ -284,7 +285,7 @@ impl InteropContext {
     pub fn resize_swap_chain(&self, width: u32, height: u32) {
         self.cached_render_target_view.take();
         unsafe {
-            self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG::default()).unwrap();
+            self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING).unwrap();
         }
     }
 
@@ -301,8 +302,9 @@ unsafe impl Send for InteropContext {}
 unsafe impl Sync for InteropContext {}
 
 pub struct InteropState {
-    pub context: Arc<InteropContext>,
-    shared_textures: BTreeMap<GLuint, SharedTexture>
+    context: Arc<InteropContext>,
+    shared_textures: BTreeMap<GLuint, SharedTexture>,
+    pub swap_interval: u32,
 }
 
 impl Deref for InteropState {
@@ -316,7 +318,7 @@ impl Deref for InteropState {
 impl InteropState {
 
     pub fn new(hwnd: HWND) -> Self {
-        Self { context: Arc::new(InteropContext::new(hwnd)), shared_textures: Default::default() }
+        Self { context: Arc::new(InteropContext::new(hwnd)), shared_textures: Default::default(), swap_interval: 1 }
     }
 
     pub fn create_shared_texture(&mut self, gl_ident: GLuint, width: u32, height: u32) -> &SharedTexture {
@@ -385,7 +387,7 @@ impl SharedTexture {
         });
 
         let interop_handle = unsafe {
-            context.wgl.DXRegisterObjectNV(context.interop_handle, &texture, gl_ident, gl_type, ACCESS_READ_WRITE_NV).unwrap()
+            context.wgl.DXRegisterObjectNV(context.interop_handle, &texture, gl_ident, gl_type, ACCESS_WRITE_DISCARD_NV).unwrap()
         };
 
         Self {

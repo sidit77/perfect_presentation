@@ -1,5 +1,5 @@
+use perfect_presentation_core::{InteropState, SharedTexture, HWND};
 use std::cell::Cell;
-use perfect_presentation_core::{InteropContext, InteropState, SharedTexture, WglContext, HWND};
 use std::collections::BTreeMap;
 use std::iter::once;
 use std::sync::Mutex;
@@ -37,7 +37,17 @@ pub unsafe extern "C" fn make_context_current(window: WindowIdentifier) -> i32 {
 pub unsafe extern "C" fn swap_buffers(window: WindowIdentifier) -> i32 {
     //println!("swap_buffers: {:?}", window);
 
-    GLFW_WINDOWS.lock().unwrap().get(&window).unwrap().present_swap_chain(1);
+    let lock = GLFW_WINDOWS.lock().unwrap();
+    let context = lock.get(&window).unwrap();
+    context.present_swap_chain(context.swap_interval);
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn set_swap_interval(window: WindowIdentifier, swap_interval: i32) -> i32 {
+    println!("setting swap interval to {:?}", swap_interval);
+
+    GLFW_WINDOWS.lock().unwrap().get_mut(&window).unwrap().swap_interval = swap_interval as u32;
     0
 }
 

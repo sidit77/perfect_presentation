@@ -7,13 +7,19 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
 import static org.lwjgl.glfw.GLFW.*;
 
 @Mixin(Window.class)
 public class WindowMixin {
+
+    @Shadow
+    @Final
+    private long window;
 
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
@@ -56,6 +62,14 @@ public class WindowMixin {
     )
     void proxyMakeCurrent(long window, Operation<Void> original) {
         PerfectPresentationNativeLibrary.makeContextCurrent(window);
+    }
+
+    @WrapOperation(
+            method = "updateVsync(Z)V",
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
+    )
+    void proxySwapInterval(int interval, Operation<Void> original) {
+        PerfectPresentationNativeLibrary.setSwapInterval(window, interval);
     }
 
 }
