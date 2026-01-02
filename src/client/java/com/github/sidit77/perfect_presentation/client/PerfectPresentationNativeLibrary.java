@@ -11,6 +11,7 @@ public class PerfectPresentationNativeLibrary {
 
     private static final String ARCH = switch(System.getProperty("os.arch")) {
         case "amd64" -> "x64";
+        case "arm64" -> "arm64";
         default -> throw new IllegalStateException("Unsupported architecture: " + System.getProperty("os.arch"));
     };
 
