@@ -9,8 +9,13 @@ import static org.lwjgl.system.APIUtil.apiGetFunctionAddress;
 
 public class PerfectPresentationNativeLibrary {
 
+    private static final String ARCH = switch(System.getProperty("os.arch")) {
+        case "amd64" -> "x64";
+        default -> throw new IllegalStateException("Unsupported architecture: " + System.getProperty("os.arch"));
+    };
+
     private static final SharedLibrary PP_NATIVE = Library.loadNative(
-            PerfectPresentationNativeLibrary.class, "", "perfect_presentation"
+            PerfectPresentationNativeLibrary.class, "", "natives/" + ARCH + "/perfect_presentation.dll"
     );
 
     public static final class Functions {

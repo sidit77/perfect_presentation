@@ -1,8 +1,47 @@
 plugins {
-    id "io.github.arc-blroth.cargo-wrapper" version "1.2.0"
+    id 'base'
 }
 
-cargo {
-    crate = projectDir.path
-    outputs = ['': 'perfect_presentation.dll']
+def cargoBuild = { String arch, String target ->
+    tasks.register("build${arch}", Exec) {
+        group = "build"
+        description = "Build Rust library for ${arch}"
+
+        workingDir = project.projectDir
+
+        commandLine "cargo", "build", "--target", target
+
+        inputs.files("Cargo.toml", "Cargo.lock")
+        inputs.dir("src")
+        inputs.dir("perfect_presentation_core/src")
+        inputs.file("perfect_presentation_core/Cargo.toml")
+
+        outputs.file file("$workingDir/target/${target}/debug/perfect_presentation.dll")
+
+    }
+}
+
+def buildX64   = cargoBuild("X64", "x86_64-pc-windows-msvc")
+//def buildArm64 = cargoBuild("Arm64", "aarch64-pc-windows-msvc")
+
+artifacts {
+    add("default", buildX64) {
+        classifier = "x64"
+    }
+
+    //add("default", buildArm64) {
+    //    classifier = "arm64"
+    //}
+}
+
+tasks.register("cargoClean", Exec) {
+    group = "build"
+    description = "Clean Cargo build outputs"
+
+    workingDir = project.projectDir
+    commandLine "cargo", "clean"
+}
+
+tasks.named("clean") {
+    dependsOn("cargoClean")
 }
