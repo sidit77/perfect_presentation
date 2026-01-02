@@ -13,8 +13,6 @@ def cargoBuild = { String arch, String target ->
 
         inputs.files("Cargo.toml", "Cargo.lock")
         inputs.dir("src")
-        inputs.dir("perfect_presentation_core/src")
-        inputs.file("perfect_presentation_core/Cargo.toml")
 
         outputs.file file("$workingDir/target/${target}/debug/perfect_presentation.dll")
 
