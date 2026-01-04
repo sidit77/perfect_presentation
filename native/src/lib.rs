@@ -9,9 +9,9 @@ use std::iter::once;
 use std::ops::Deref;
 use std::slice::from_raw_parts;
 use std::sync::{Arc, Weak};
-use windows::core::{s, w};
-use windows::Win32::Foundation::{FALSE, HMODULE};
-use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, GetClientRect, WINDOW_EX_STYLE, WS_POPUP};
+use windows::core::{s, w, Interface, Owned};
+use windows::Win32::Foundation::{FALSE, HANDLE, HMODULE, WAIT_OBJECT_0};
+use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_POPUP};
 
 use crate::wgl::{DxDeviceHandle, DxResourceHandle, GLenum, GLuint, Wgl, ACCESS_WRITE_DISCARD_NV, CONTEXT_CORE_PROFILE_BIT_ARB, CONTEXT_FLAGS_ARB, CONTEXT_FORWARD_COMPATIBLE_BIT_ARB, CONTEXT_MAJOR_VERSION_ARB, CONTEXT_MINOR_VERSION_ARB, CONTEXT_PROFILE_MASK_ARB};
 pub use windows::Win32::Foundation::HWND;
@@ -19,9 +19,10 @@ use windows::Win32::Graphics::Direct3D::Fxc::D3DCompile;
 use windows::Win32::Graphics::Direct3D::{D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_DRIVER_TYPE_HARDWARE};
 use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView, ID3D11ShaderResourceView, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_CULL_NONE, D3D11_FILL_SOLID, D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_RASTERIZER_DESC, D3D11_SAMPLER_DESC, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_USAGE_DEFAULT, D3D11_VIEWPORT};
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_UNSPECIFIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC};
-use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT_ALLOW_TEARING, DXGI_SCALING_NONE, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
+use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain2, DXGI_PRESENT_ALLOW_TEARING, DXGI_SCALING_NONE, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT};
 use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC, HDC};
 use windows::Win32::Graphics::OpenGL::{wglCreateContext, wglDeleteContext, wglMakeCurrent, ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, GL_TEXTURE_2D, HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR};
+use windows::Win32::System::Threading::WaitForSingleObject;
 
 pub struct WglContext {
     hwnd: HWND,
@@ -142,13 +143,6 @@ impl Drop for WglContext {
     }
 }
 
-pub fn get_window_size(hwnd: isize) -> (i32, i32) {
-    let hwnd = HWND(hwnd as _);
-    let mut rect = Default::default();
-    unsafe { GetClientRect(hwnd, &mut rect).expect("GetClientRect failed"); }
-    (rect.right - rect.left, rect.bottom - rect.top)
-}
-
 const _: () = assert!(AtomicCell::<Option<ID3D11RenderTargetView>>::is_lock_free());
 
 pub struct InteropContext {
@@ -156,8 +150,9 @@ pub struct InteropContext {
     pub dxgi_factory: IDXGIFactory2,
     pub device: ID3D11Device,
     pub device_context: ID3D11DeviceContext,
-    pub swap_chain: IDXGISwapChain1,
+    pub swap_chain: IDXGISwapChain2,
     pub interop_handle: DxDeviceHandle,
+    pub wait_handle: WaitHandle,
 
     cached_render_target_view: AtomicCell<Option<ID3D11RenderTargetView>>,
 }
@@ -202,11 +197,16 @@ impl InteropContext {
                 Scaling: DXGI_SCALING_NONE,
                 SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
                 AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
-                Flags: DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as _,
+                Flags: (DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT).0 as _,
             },
             None,
             None
-        ).unwrap() };
+        ).unwrap().cast::<IDXGISwapChain2>().unwrap() };
+
+        let wait_handle = unsafe {
+            swap_chain.SetMaximumFrameLatency(1).unwrap();
+            WaitHandle::create(&swap_chain)
+        };
 
         let interop_handle = unsafe { wgl.DXOpenDeviceNV(&device).unwrap() };
 
@@ -254,7 +254,7 @@ impl InteropContext {
             device_context.PSSetSamplers(0, Some(&[Some(sampler_state)]));
         }
 
-        Self { wgl, dxgi_factory, device, device_context, swap_chain, interop_handle, cached_render_target_view: AtomicCell::new(None) }
+        Self { wgl, dxgi_factory, device, device_context, swap_chain, interop_handle, wait_handle, cached_render_target_view: AtomicCell::new(None) }
     }
 
     pub fn present_swap_chain(&self, interval: u32) {
@@ -290,7 +290,7 @@ impl InteropContext {
     pub fn resize_swap_chain(&self, width: u32, height: u32) {
         self.cached_render_target_view.take();
         unsafe {
-            self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING).unwrap();
+            self.swap_chain.ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT).unwrap();
         }
     }
 
@@ -457,4 +457,20 @@ fn make_resource<T>(func: impl FnOnce(Option<*mut Option<T>>) -> windows::core::
     func(Some(&mut obj))
         .expect("Resource creation failed");
     obj.expect("Returned resource is null")
+}
+
+pub struct WaitHandle(Owned<HANDLE>);
+unsafe impl Send for WaitHandle {}
+impl WaitHandle {
+
+    fn create(swap_chain: &IDXGISwapChain2) -> Self {
+        Self(unsafe { Owned::new(swap_chain.GetFrameLatencyWaitableObject()) })
+    }
+
+    pub fn wait(&self) {
+        let result = unsafe { WaitForSingleObject(*self.0, 1000) };
+        if result != WAIT_OBJECT_0 {
+            println!("Unexpected wait for swap chain wait: {:?}", result);
+        }
+    }
 }

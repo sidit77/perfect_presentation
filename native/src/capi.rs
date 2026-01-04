@@ -44,6 +44,12 @@ pub unsafe extern "C" fn set_swap_interval(window: WindowIdentifier, swap_interv
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn wait_for_swap_chain(window: WindowIdentifier) -> i32 {
+    GLFW_WINDOWS.lock().unwrap().get_mut(&window).unwrap().wait_handle.wait();
+    0
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn create_shared_texture(gl_ident: i32, width: i32, height: i32) -> i32 {
     let window = CURRENT_CONTEXT.with(|cell| cell.get().expect("No current context"));
     let mut lock = GLFW_WINDOWS.lock().unwrap();
