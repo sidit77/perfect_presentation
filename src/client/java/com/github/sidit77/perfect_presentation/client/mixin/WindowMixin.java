@@ -2,7 +2,7 @@ package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.ContextCreationFlags;
 import com.github.sidit77.perfect_presentation.client.PerfectPresentationClient;
-import com.github.sidit77.perfect_presentation.client.PerfectPresentationNativeLibrary;
+import com.github.sidit77.perfect_presentation.client.WGLContext;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
@@ -10,8 +10,10 @@ import org.lwjgl.glfw.GLFWNativeWin32;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -23,24 +25,30 @@ public class WindowMixin {
     @Final
     private long window;
 
+    @Unique
+    private final ContextCreationFlags contextCreationFlags = new ContextCreationFlags();
+
+    @Unique
+    private WGLContext openglContext;
+
+
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwWindowHint(II)V")
     )
     void captureWindowHint(int hint, int value, Operation<Void> original) {
-        var storedContextFlags = PerfectPresentationClient.contextCreationFlags;
         switch (hint) {
             case GLFW_CLIENT_API -> glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             case GLFW_CONTEXT_CREATION_API -> { }
-            case GLFW_CONTEXT_VERSION_MAJOR -> storedContextFlags.majorVersion = value;
-            case GLFW_CONTEXT_VERSION_MINOR -> storedContextFlags.minorVersion = value;
-            case GLFW_OPENGL_PROFILE -> storedContextFlags.profile = switch (value) {
+            case GLFW_CONTEXT_VERSION_MAJOR -> contextCreationFlags.majorVersion = value;
+            case GLFW_CONTEXT_VERSION_MINOR -> contextCreationFlags.minorVersion = value;
+            case GLFW_OPENGL_PROFILE -> contextCreationFlags.profile = switch (value) {
                 case GLFW_OPENGL_CORE_PROFILE -> ContextCreationFlags.Profile.CORE;
                 case GLFW_OPENGL_COMPAT_PROFILE -> ContextCreationFlags.Profile.COMPAT;
                 case GLFW_OPENGL_ANY_PROFILE -> ContextCreationFlags.Profile.ANY;
                 default -> throw new IllegalArgumentException("Unexpected value: " + value);
             };
-            case GLFW_OPENGL_FORWARD_COMPAT -> storedContextFlags.forwardCompatible = value != GLFW_FALSE;
+            case GLFW_OPENGL_FORWARD_COMPAT -> contextCreationFlags.forwardCompatible = value != GLFW_FALSE;
             default -> glfwWindowHint(hint, value);
         }
     }
@@ -51,10 +59,13 @@ public class WindowMixin {
     )
     long createInteropSwapChain(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
         glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         var window = original.call(width, height, title, 0L, share);
+
         //TODO verify that we're on Windows
         var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
-        PerfectPresentationNativeLibrary.createContextAndSwapChain(window, hwnd);
+        //PerfectPresentationNativeLibrary.createContextAndSwapChain(window, hwnd);
+        openglContext = new WGLContext(hwnd, contextCreationFlags);
         return window;
     }
 
@@ -63,15 +74,24 @@ public class WindowMixin {
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
     )
     void proxyMakeCurrent(long window, Operation<Void> original) {
-        PerfectPresentationNativeLibrary.makeContextCurrent(window);
+        openglContext.makeCurrent();
+        //PerfectPresentationNativeLibrary.makeContextCurrent(window);
     }
 
-    @WrapOperation(
+    @Redirect(
             method = "updateVsync(Z)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
     )
-    void proxySwapInterval(int interval, Operation<Void> original) {
-        PerfectPresentationNativeLibrary.setSwapInterval(window, interval);
+    void proxySwapInterval(int interval) {
+        //PerfectPresentationNativeLibrary.setSwapInterval(window, interval);
+    }
+
+    @Inject(
+            method = "updateDisplay()V",
+            at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/systems/RenderSystem;flipFrame(J)V")
+    )
+    void actuallySwapBuffers(CallbackInfo ci) {
+        openglContext.swapBuffers();
     }
 
     @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
@@ -86,8 +106,11 @@ public class WindowMixin {
     }
 
     @Inject(method = "close", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwDestroyWindow(J)V"))
-    void destroyInteropContext(CallbackInfo ci) {
-        PerfectPresentationNativeLibrary.destroyContext(window);
+    void destroyInteropContext(CallbackInfo ci) throws Exception {
+        openglContext.close();
+        openglContext = null;
+
+        //PerfectPresentationNativeLibrary.destroyContext(window);
     }
 
 }

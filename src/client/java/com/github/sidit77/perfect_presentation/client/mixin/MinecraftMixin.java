@@ -1,6 +1,5 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
-import com.github.sidit77.perfect_presentation.client.PerfectPresentationNativeLibrary;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
@@ -28,7 +27,7 @@ public class MinecraftMixin {
 
     @Inject(method = "resizeDisplay", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;resize(IIZ)V"))
     void resizeSwapChain(CallbackInfo ci) {
-        PerfectPresentationNativeLibrary.resizeSwapChain(window.getWindow(), window.getWidth(), window.getHeight());
+        //PerfectPresentationNativeLibrary.resizeSwapChain(window.getWindow(), window.getWidth(), window.getHeight());
     }
 
     @Inject(
@@ -37,7 +36,7 @@ public class MinecraftMixin {
     )
     void waitForSwapChain(boolean bl, CallbackInfo ci) {
         profiler.push("vsync");
-        PerfectPresentationNativeLibrary.waitForSwapChain(window.getWindow());
+        //PerfectPresentationNativeLibrary.waitForSwapChain(window.getWindow());
         profiler.pop();
     }
 

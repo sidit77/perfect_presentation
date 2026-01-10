@@ -49,7 +49,6 @@ dependencies {
 
 generateWindowsApi {
     functions = [
-            "MessageBoxW",
             "D3D11CreateDevice",
             "CreateDXGIFactory1",
             "FormatMessageW",

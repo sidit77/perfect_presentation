@@ -1,16 +1,9 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
-import com.github.sidit77.perfect_presentation.client.PerfectPresentationNativeLibrary;
 import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.RenderSystem;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.Unique;
-
-import static com.mojang.blaze3d.platform.GlConst.*;
 
 @Mixin(MainTarget.class)
 public class MainTargetMixin extends RenderTarget {
@@ -27,6 +20,7 @@ public class MainTargetMixin extends RenderTarget {
         createBuffers(i, j, false);
     }
 
+    /*
     @Override
     public void bindWrite(boolean bl) {
         if (!RenderSystem.isOnRenderThread()) {
@@ -42,7 +36,6 @@ public class MainTargetMixin extends RenderTarget {
         GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, this.frameBufferId);
         if (bl) {
             GlStateManager._viewport(0, 0, this.viewWidth, this.viewHeight);
-            //GlStateManager._viewport(this.viewWidth, 0, 0, this.viewHeight);
         }
     }
 
@@ -149,4 +142,5 @@ public class MainTargetMixin extends RenderTarget {
             System.out.println("Warning: blitToScreen called with incorrect dimensions!");
         PerfectPresentationNativeLibrary.blitSharedTextureToScreen(this.colorTextureId);
     }
+    */
 }
