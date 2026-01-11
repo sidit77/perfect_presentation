@@ -4,8 +4,12 @@
   "version": "${version}",
   "name": "Perfect Presentation",
   "description": "Improved frame pacing, VRR support, and fullscreen behavior for Windows",
-  "authors": [],
-  "contact": {},
+  "authors": ["sidit77"],
+  "contact": {
+    "issues": "https://github.com/sidit77/perfect_presentation/issues",
+    "sources": "https://github.com/sidit77/perfect_presentation",
+    "homepage": "https://github.com/sidit77/perfect_presentation"
+  },
   "license": "MIT",
   "icon": "assets/perfect_presentation/icon.png",
   "environment": "client",
