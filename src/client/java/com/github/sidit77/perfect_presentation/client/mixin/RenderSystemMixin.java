@@ -14,7 +14,7 @@ public class RenderSystemMixin {
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapBuffers(J)V")
     )
     private static void proxySwapBuffers(long window) {
-        InteropContext.getCurrentContext().swapBuffers();
+        InteropContext.getCurrentContext().swapChainPresent();
     }
 
 }

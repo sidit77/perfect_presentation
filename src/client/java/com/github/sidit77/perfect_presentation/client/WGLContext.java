@@ -3,16 +3,19 @@ package com.github.sidit77.perfect_presentation.client;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.PIXELFORMATDESCRIPTOR;
+import org.lwjgl.system.windows.User32;
+import org.lwjgl.system.windows.WNDCLASSEX;
+import org.lwjgl.system.windows.WindowsLibrary;
 
 import static org.lwjgl.opengl.WGL.*;
 import static org.lwjgl.opengl.WGLARBCreateContext.*;
 import static org.lwjgl.opengl.WGLARBCreateContextProfile.*;
 import static org.lwjgl.system.Checks.check;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.system.windows.GDI32.*;
 import static org.lwjgl.system.windows.GDI32.SetPixelFormat;
-import static org.lwjgl.system.windows.User32.GetDC;
-import static org.lwjgl.system.windows.User32.ReleaseDC;
+import static org.lwjgl.system.windows.User32.*;
 import static org.lwjgl.system.windows.WindowsUtil.windowsThrowException;
 
 public class WGLContext implements AutoCloseable {
@@ -21,9 +24,17 @@ public class WGLContext implements AutoCloseable {
     private final long hdc;
     private final long hglrc;
 
-    public WGLContext(long hwnd, ContextCreationFlags flags) {
+    public WGLContext(ContextCreationFlags flags) {
         try (MemoryStack stack = stackPush()) {
-            this.hwnd = hwnd;
+            hwnd = check(nCreateWindowEx(
+                    0,
+                    memAddress(stack.UTF16("STATIC")),
+                    memAddress(stack.UTF16("Hidden Context Window")),
+                    WS_POPUP,
+                    0, 0, 1, 1,
+                    NULL, NULL, NULL, NULL
+            ));
+
             hdc = check(GetDC(hwnd));
             PIXELFORMATDESCRIPTOR pfd = PIXELFORMATDESCRIPTOR.calloc(stack)
                     .nSize((short)PIXELFORMATDESCRIPTOR.SIZEOF)
@@ -76,14 +87,11 @@ public class WGLContext implements AutoCloseable {
         wglMakeCurrent(hdc, hglrc);
     }
 
-    public void swapBuffers() {
-        SwapBuffers(hdc);
-    }
-
     @Override
     public void close() {
         wglMakeCurrent(hdc, 0);
         wglDeleteContext(hglrc);
         ReleaseDC(hwnd, hdc);
+        DestroyWindow(hwnd);
     }
 }

@@ -2,12 +2,11 @@ package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.ContextCreationFlags;
 import com.github.sidit77.perfect_presentation.client.InteropContext;
-import com.github.sidit77.perfect_presentation.client.PerfectPresentationClient;
-import com.github.sidit77.perfect_presentation.client.WGLContext;
+import com.github.sidit77.perfect_presentation.client.InteropContextProvider;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFWNativeWin32;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,29 +16,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import windows.win32.graphics.direct3d.D3D_DRIVER_TYPE;
-import windows.win32.graphics.direct3d11.ID3D11Device;
-import windows.win32.graphics.direct3d11.ID3D11DeviceContext;
-import windows.win32.graphics.direct3d11.ID3D11RenderTargetView;
-import windows.win32.graphics.dxgi.IDXGIFactory2;
-import windows.win32.graphics.dxgi.IDXGISwapChain1;
-import windows.win32.system.com.IUnknownHelper;
 
-import java.lang.foreign.Arena;
-
-import static com.github.sidit77.perfect_presentation.client.WinError.checkSuccessful;
-import static java.lang.foreign.MemorySegment.NULL;
-import static java.lang.foreign.ValueLayout.ADDRESS;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.WGLNVDXInterop.*;
-import static org.lwjgl.system.Checks.check;
-import static windows.win32.graphics.direct3d11.Apis.D3D11CreateDevice;
-import static windows.win32.graphics.direct3d11.Constants.D3D11_SDK_VERSION;
-import static windows.win32.graphics.direct3d11.D3D11_CREATE_DEVICE_FLAG.D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-import static windows.win32.graphics.direct3d11.D3D11_CREATE_DEVICE_FLAG.D3D11_CREATE_DEVICE_DEBUG;
 
 @Mixin(Window.class)
-public class WindowMixin {
+public abstract class WindowMixin implements InteropContextProvider {
 
     @Shadow
     @Final
@@ -121,4 +102,8 @@ public class WindowMixin {
         interopContext.close();
     }
 
+    @Override
+    public InteropContext prefect_presentation$getInteropContext() {
+        return interopContext;
+    }
 }

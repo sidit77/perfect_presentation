@@ -109,8 +109,7 @@ public class MainTargetMixin extends RenderTarget {
         RenderSystem.assertOnRenderThread();
         if(w != this.width || h != this.height || !noBlend)
             System.out.println("Warning: blitToScreen called with incorrect dimensions!");
-        super.blitToScreen(w, h, noBlend);
-        //PerfectPresentationNativeLibrary.blitSharedTextureToScreen(this.colorTextureId);
+        InteropContext.getCurrentContext().blitSharedTextureToSwapChain(this.colorTextureId);
     }
 
 }

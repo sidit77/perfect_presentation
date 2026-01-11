@@ -59,7 +59,8 @@ generateWindowsApi {
             "ID3D11Device",
             "ID3D11DeviceContext",
             "IDXGIFactory2",
-            "ID3D11RenderTargetView"
+            "ID3D11RenderTargetView",
+            "IDXGISwapChain2"
     ]
     constants = [
             "D3D11_SDK_VERSION"
