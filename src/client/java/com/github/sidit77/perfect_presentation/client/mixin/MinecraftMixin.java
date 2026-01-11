@@ -45,7 +45,7 @@ public class MinecraftMixin {
     )
     void waitForSwapChain(boolean bl, CallbackInfo ci) {
         profiler.push("vsync");
-        //PerfectPresentationNativeLibrary.waitForSwapChain(window.getWindow());
+        //TODO Implement waitable swap chains
         profiler.pop();
     }
 

@@ -53,7 +53,8 @@ generateWindowsApi {
             "CreateDXGIFactory1",
             "FormatMessageW",
             "GetModuleHandleW",
-            "LocalFree"
+            "LocalFree",
+            "D3DCompile"
     ]
     comInterfaces = [
             "ID3D11Device",
@@ -66,7 +67,8 @@ generateWindowsApi {
             "D3D11_SDK_VERSION"
     ]
     enumerations = [
-            "D3D11_BIND_FLAG"
+            "D3D11_BIND_FLAG",
+            "D3D_PRIMITIVE_TOPOLOGY"
     ]
 }
 

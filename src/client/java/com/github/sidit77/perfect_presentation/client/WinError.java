@@ -63,7 +63,7 @@ public class WinError {
      */
     public static void checkSuccessful(int errorCode) {
         if (errorCode < 0)
-            throw new IllegalStateException(getErrorMessage(errorCode));
+            throw new IllegalStateException("HRESULT 0x%x: %s".formatted(errorCode, getErrorMessage(errorCode)));
     }
 
     /**

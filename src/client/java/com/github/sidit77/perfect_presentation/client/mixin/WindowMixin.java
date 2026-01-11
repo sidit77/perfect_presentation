@@ -75,7 +75,6 @@ public abstract class WindowMixin implements InteropContextProvider {
     )
     void proxyMakeCurrent(long window, Operation<Void> original) {
         interopContext.makeCurrent();
-        //PerfectPresentationNativeLibrary.makeContextCurrent(window);
     }
 
     @Redirect(
@@ -83,7 +82,7 @@ public abstract class WindowMixin implements InteropContextProvider {
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
     )
     void proxySwapInterval(int interval) {
-        //PerfectPresentationNativeLibrary.setSwapInterval(window, interval);
+        //TODO implement setting the swap interval
     }
 
     @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
