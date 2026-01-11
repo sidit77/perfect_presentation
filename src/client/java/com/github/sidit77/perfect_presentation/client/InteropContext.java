@@ -3,6 +3,9 @@ package com.github.sidit77.perfect_presentation.client;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.WindowsUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import windows.win32.foundation.WAIT_EVENT;
 import windows.win32.graphics.direct3d.D3D_DRIVER_TYPE;
 import windows.win32.graphics.direct3d.D3D_PRIMITIVE_TOPOLOGY;
 import windows.win32.graphics.direct3d.ID3DBlob;
@@ -15,6 +18,7 @@ import windows.win32.system.com.IUnknown;
 import windows.win32.system.com.IUnknownHelper;
 
 import java.lang.foreign.Arena;
+import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.reflect.InvocationTargetException;
@@ -30,12 +34,14 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.nio.charset.StandardCharsets.*;
 import static org.lwjgl.opengl.WGLNVDXInterop.*;
 import static org.lwjgl.system.Checks.check;
+import static windows.win32.foundation.Apis.CloseHandle;
 import static windows.win32.graphics.direct3d.fxc.Apis.D3DCompile;
 import static windows.win32.graphics.direct3d11.Apis.D3D11CreateDevice;
 import static windows.win32.graphics.direct3d11.Constants.D3D11_SDK_VERSION;
 import static windows.win32.graphics.direct3d11.D3D11_CREATE_DEVICE_FLAG.D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 import static windows.win32.graphics.direct3d11.D3D11_CREATE_DEVICE_FLAG.D3D11_CREATE_DEVICE_DEBUG;
 import static windows.win32.graphics.dxgi.Apis.CreateDXGIFactory1;
+import static windows.win32.system.threading.Apis.WaitForSingleObject;
 
 public class InteropContext implements AutoCloseable {
 
@@ -48,6 +54,7 @@ public class InteropContext implements AutoCloseable {
         return context;
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(InteropContext.class);
     private static final int SWAP_CHAIN_FLAGS = DXGI_SWAP_CHAIN_FLAG.ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG.FRAME_LATENCY_WAITABLE_OBJECT;
 
     private final WGLContext openglContext;
@@ -57,6 +64,7 @@ public class InteropContext implements AutoCloseable {
     private final ID3D11Device device;
     private final ID3D11DeviceContext context;
     private final IDXGISwapChain2 swapChain;
+    private final WaitHandle waitHandle;
     private @Nullable ID3D11RenderTargetView renderTargetView = null;
 
     private final Map<Integer, SharedTexture> sharedTextures = new HashMap<>();
@@ -73,7 +81,7 @@ public class InteropContext implements AutoCloseable {
                         NULL,
                         D3D_DRIVER_TYPE.HARDWARE,
                         NULL,
-                        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_DEBUG,
+                        D3D11_CREATE_DEVICE_BGRA_SUPPORT | (PerfectPresentationClient.config.useDxDebugLayer() ? D3D11_CREATE_DEVICE_DEBUG : 0),
                         NULL,
                         0,
                         D3D11_SDK_VERSION,
@@ -113,6 +121,9 @@ public class InteropContext implements AutoCloseable {
                     IDXGISwapChain1::wrap);
 
             swapChain = comCast(arena, swapChain1, IDXGISwapChain2.class);
+
+            checkSuccessful(swapChain.SetMaximumFrameLatency(1));
+            waitHandle = new WaitHandle(swapChain.GetFrameLatencyWaitableObject());
 
             swapChain1.Release();
             factory.Release();
@@ -204,6 +215,10 @@ public class InteropContext implements AutoCloseable {
         this.syncInterval = syncInterval;
     }
 
+    public void waitForSwapChainSignal() {
+        waitHandle.waitForSignal();
+    }
+
     public void swapChainPresent() {
         checkSuccessful(swapChain.Present(syncInterval, syncInterval == 0 ? DXGI_PRESENT.ALLOW_TEARING : 0));
     }
@@ -279,6 +294,7 @@ public class InteropContext implements AutoCloseable {
             renderTargetView = null;
         }
 
+        waitHandle.close();
         swapChain.Release();
 
         wglDXCloseDeviceNV(interopDeviceHandle);
@@ -332,7 +348,8 @@ public class InteropContext implements AutoCloseable {
 
         public void lock() {
             if (locked) {
-                throw new IllegalStateException("Already locked");
+                LOGGER.warn("Shared texture is already locked");
+                return;
             }
 
             try(var memStack = MemoryStack.stackPush()) {
@@ -346,7 +363,8 @@ public class InteropContext implements AutoCloseable {
 
         public void unlock() {
             if (!locked) {
-                throw new IllegalStateException("Already unlocked");
+                LOGGER.warn("Shared texture is already unlocked");
+                return;
             }
 
             try(var memStack = MemoryStack.stackPush()) {
@@ -367,6 +385,39 @@ public class InteropContext implements AutoCloseable {
                 WindowsUtil.windowsThrowException("Failed to unregister the shared texture");
             }
             textureView.Release();
+        }
+    }
+
+    private record WaitHandle(MemorySegment handle) implements AutoCloseable {
+
+        public void waitForSignal() {
+            try(var arena = Arena.ofConfined()) {
+                var errorState = arena.allocate(Linker.Option.captureStateLayout());
+                var result = WaitForSingleObject(errorState, handle, 1000);
+
+                switch (result) {
+                    case WAIT_EVENT.WAIT_OBJECT_0 -> {}
+                    case WAIT_EVENT.WAIT_ABANDONED -> LOGGER.warn("Swap chain wait abandoned unexpectedly");
+                    case WAIT_EVENT.WAIT_TIMEOUT -> LOGGER.warn("Swap chain wait timed out");
+                    case WAIT_EVENT.WAIT_FAILED -> checkSuccessful(errorState);
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Failed to wait for swap chain signal", e);
+            }
+        }
+
+        @Override
+        public void close() {
+            try(var arena = Arena.ofConfined()) {
+                var errorState = arena.allocate(Linker.Option.captureStateLayout());
+                var result = CloseHandle(errorState, handle);
+                if(result == 0) {
+                    checkSuccessful(errorState);
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Failed to close wait handle", e);
+            }
+
         }
     }
 

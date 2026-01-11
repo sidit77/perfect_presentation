@@ -54,7 +54,9 @@ generateWindowsApi {
             "FormatMessageW",
             "GetModuleHandleW",
             "LocalFree",
-            "D3DCompile"
+            "D3DCompile",
+            "CloseHandle",
+            "WaitForSingleObject"
     ]
     comInterfaces = [
             "ID3D11Device",
