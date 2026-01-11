@@ -96,7 +96,7 @@ public abstract class WindowMixin implements InteropContextProvider {
     }
 
     @Inject(method = "close", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwDestroyWindow(J)V"))
-    void destroyInteropContext(CallbackInfo ci) throws Exception {
+    void destroyInteropContext(CallbackInfo ci) {
         interopContext.close();
     }
 
