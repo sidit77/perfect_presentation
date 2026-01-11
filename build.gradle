@@ -22,13 +22,6 @@ loom {
     }
 }
 
-configurations {
-    natives {
-        canBeConsumed = false
-        canBeResolved = true
-    }
-}
-
 repositories {
     // Add repositories to retrieve artifacts from in here.
     // You should only use this when depending on other mods because
@@ -38,13 +31,10 @@ repositories {
 }
 
 dependencies {
-    natives project(":native")
-
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
 }
 
 generateWindowsApi {
@@ -75,13 +65,6 @@ generateWindowsApi {
 }
 
 processResources {
-    dependsOn configurations.natives
-    configurations.natives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
-        from(artifact.file) {
-            into "natives/${artifact.classifier}"
-        }
-    }
-
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
     inputs.property "loader_version", project.loader_version

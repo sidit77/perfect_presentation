@@ -19,13 +19,6 @@ This mod replaces Minecraft’s default OpenGL swap chain with a modern DXGI fli
 
 To accomplish this, the mod moves Minecraft’s OpenGL rendering context into a separate, hidden window. Using DirectX–OpenGL interoperability extensions, the final copy from the internal framebuffer to the back buffer is performed via DirectX11 instead of OpenGL, which allows the use of a DXGI swap chain.
 
-## Supported Platforms
-
-* Windows x64
-* Windows ARM64
-
-**Note:** This is a Windows-only mod. While 32-bit Windows builds may be theoretically possible, it is unlikely that a 32-bit system would meet the other requirements.
-
 ## Requirements
 
 * A graphics card that supports:
@@ -33,11 +26,7 @@ To accomplish this, the mod moves Minecraft’s OpenGL rendering context into a 
     * DirectX 11
     * OpenGL
     * The `NV_DX_interop2` extension
-* Standard Minecraft system requirements
-
-## Build Requirements
-
-This mod contains native code and therefore requires a working Rust toolchain to build.
+* Java >= 23
 
 ## Known Issues
 - V-Sync doesn't seem to reliably work in windowed mode
