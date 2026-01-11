@@ -14,16 +14,11 @@ import windows.win32.graphics.dxgi.common.DXGI_SAMPLE_DESC;
 import windows.win32.system.com.IUnknown;
 import windows.win32.system.com.IUnknownHelper;
 
-import java.io.IOException;
 import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 
 import static com.github.sidit77.perfect_presentation.client.WinError.checkSuccessful;
@@ -65,32 +60,31 @@ public class InteropContext implements AutoCloseable {
     public InteropContext(long hwnd, ContextCreationFlags flags) {
         openglContext = new WGLContext(flags);
         try (var arena = Arena.ofConfined()) {
-            var hr = 0;
-            var devicePtr = arena.allocate(ADDRESS);
-            var contextPtr = arena.allocate(ADDRESS);
-            hr = D3D11CreateDevice(
-                    NULL,
-                    D3D_DRIVER_TYPE.HARDWARE,
-                    NULL,
-                    D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_DEBUG,
-                    NULL,
-                    0,
-                    D3D11_SDK_VERSION,
-                    devicePtr,
-                    NULL,
-                    contextPtr
-            );
-            checkSuccessful(hr);
 
-            this.device = ID3D11Device.wrap(devicePtr.get(ADDRESS, 0));
-            this.context = ID3D11DeviceContext.wrap(contextPtr.get(ADDRESS, 0));
+            {
+                var devicePtr = arena.allocate(ADDRESS);
+                var contextPtr = arena.allocate(ADDRESS);
+                var hr = D3D11CreateDevice(
+                        NULL,
+                        D3D_DRIVER_TYPE.HARDWARE,
+                        NULL,
+                        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_DEBUG,
+                        NULL,
+                        0,
+                        D3D11_SDK_VERSION,
+                        devicePtr,
+                        NULL,
+                        contextPtr
+                );
+                checkSuccessful(hr);
+
+                this.device = ID3D11Device.wrap(devicePtr.get(ADDRESS, 0));
+                this.context = ID3D11DeviceContext.wrap(contextPtr.get(ADDRESS, 0));
+            }
 
             this.interopDeviceHandle = check(wglDXOpenDeviceNV(IUnknownHelper.as_raw(device).address()));
 
-            var factoryPtr = arena.allocate(ADDRESS);
-            hr = CreateDXGIFactory1(IDXGIFactory2.iid(), factoryPtr);
-            checkSuccessful(hr);
-            var factory = IDXGIFactory2.wrap(factoryPtr.get(ADDRESS, 0));
+            var factory = makeResource(arena, ptr -> CreateDXGIFactory1(IDXGIFactory2.iid(), ptr), IDXGIFactory2::wrap);
 
             var swapChainDesc = DXGI_SWAP_CHAIN_DESC1.allocate(arena);
             DXGI_SWAP_CHAIN_DESC1.Format(swapChainDesc, DXGI_FORMAT.B8G8R8A8_UNORM);
@@ -103,51 +97,39 @@ public class InteropContext implements AutoCloseable {
             DXGI_SWAP_CHAIN_DESC1.AlphaMode(swapChainDesc, DXGI_ALPHA_MODE.UNSPECIFIED);
             DXGI_SWAP_CHAIN_DESC1.Flags(swapChainDesc, 0);
 
-            var swapChainPtr = arena.allocate(ADDRESS);
-            hr = factory.CreateSwapChainForHwnd(IUnknownHelper.as_raw(device), MemorySegment.ofAddress(hwnd), swapChainDesc, NULL, NULL, swapChainPtr);
-            checkSuccessful(hr);
-            swapChain = IDXGISwapChain1.wrap(swapChainPtr.get(ADDRESS, 0));
+            swapChain = makeResource(arena,
+                    ptr -> factory.CreateSwapChainForHwnd(
+                            IUnknownHelper.as_raw(device),
+                            MemorySegment.ofAddress(hwnd),
+                            swapChainDesc,
+                            NULL,
+                            NULL,
+                            ptr),
+                    IDXGISwapChain1::wrap);
 
             factory.Release();
 
             var shaderSource = arena.allocateFrom(BLIT_SHADER_SOURCE, UTF_8);
 
             var vertexShaderBlob = compileShaderSource(arena, shaderSource, "VsMain", "vs_5_0");
-
-            var vertexShaderPtr = arena.allocate(ADDRESS);
-            hr = device.CreateVertexShader(vertexShaderBlob.GetBufferPointer(), vertexShaderBlob.GetBufferSize(), NULL, vertexShaderPtr);
-            checkSuccessful(hr);
-            var vertexShader = ID3D11VertexShader.wrap(vertexShaderPtr.get(ADDRESS, 0));
+            var vertexShader = makeResource(arena, ptr -> device.CreateVertexShader(vertexShaderBlob.GetBufferPointer(), vertexShaderBlob.GetBufferSize(), NULL, ptr), ID3D11VertexShader::wrap);
             vertexShaderBlob.Release();
 
-
             var pixelShaderBlob = compileShaderSource(arena, shaderSource, "PsMain", "ps_5_0");
-
-            var pixelShaderPtr = arena.allocate(ADDRESS);
-            hr = device.CreatePixelShader(pixelShaderBlob.GetBufferPointer(), pixelShaderBlob.GetBufferSize(), NULL, pixelShaderPtr);
-            checkSuccessful(hr);
-            var pixelShader = ID3D11PixelShader.wrap(pixelShaderPtr.get(ADDRESS, 0));
+            var pixelShader = makeResource(arena, ptr -> device.CreatePixelShader(pixelShaderBlob.GetBufferPointer(), pixelShaderBlob.GetBufferSize(), NULL, ptr), ID3D11PixelShader::wrap);
             pixelShaderBlob.Release();
 
             var rasterizerStateDesc = D3D11_RASTERIZER_DESC.allocate(arena);
             D3D11_RASTERIZER_DESC.FillMode(rasterizerStateDesc, D3D11_FILL_MODE.D3D11_FILL_SOLID);
             D3D11_RASTERIZER_DESC.CullMode(rasterizerStateDesc, D3D11_CULL_MODE.D3D11_CULL_NONE);
-
-            var rasterizerStatePtr = arena.allocate(ADDRESS);
-            hr = device.CreateRasterizerState(rasterizerStateDesc, rasterizerStatePtr);
-            checkSuccessful(hr);
-            var rasterizerState = ID3D11RasterizerState.wrap(rasterizerStatePtr.get(ADDRESS, 0));
+            var rasterizerState = makeResource(arena, ptr -> device.CreateRasterizerState(rasterizerStateDesc, ptr), ID3D11RasterizerState::wrap);
 
             var samplerStateDesc = D3D11_SAMPLER_DESC.allocate(arena);
             D3D11_SAMPLER_DESC.Filter(samplerStateDesc, D3D11_FILTER.MIN_MAG_MIP_POINT);
             D3D11_SAMPLER_DESC.AddressU(samplerStateDesc, D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_WRAP);
             D3D11_SAMPLER_DESC.AddressV(samplerStateDesc, D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_WRAP);
             D3D11_SAMPLER_DESC.AddressW(samplerStateDesc, D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_WRAP);
-
-            var samplerStatePtr = arena.allocate(ADDRESS);
-            hr = device.CreateSamplerState(samplerStateDesc, samplerStatePtr);
-            checkSuccessful(hr);
-            var samplerState = ID3D11SamplerState.wrap(samplerStatePtr.get(ADDRESS, 0));
+            var samplerState = makeResource(arena, ptr -> device.CreateSamplerState(samplerStateDesc, ptr), ID3D11SamplerState::wrap);
 
             context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             context.VSSetShader(IUnknownHelper.as_raw(vertexShader), NULL, 0);
@@ -187,7 +169,7 @@ public class InteropContext implements AutoCloseable {
         var ptr = arena.allocate(ADDRESS);
         var hr = factory.apply(ptr);
         checkSuccessful(hr);
-        return wrapper.apply(ptr);
+        return wrapper.apply(ptr.get(ADDRESS, 0));
     }
 
     public void makeCurrent() {
@@ -196,8 +178,7 @@ public class InteropContext implements AutoCloseable {
     }
 
     public void swapChainPresent() {
-        var hr = swapChain.Present(1, 0);
-        checkSuccessful(hr);
+        checkSuccessful(swapChain.Present(1, 0));
     }
 
     public void resizeSwapChain(int width, int height) {
@@ -205,8 +186,7 @@ public class InteropContext implements AutoCloseable {
             renderTargetView.Release();
             renderTargetView = null;
         }
-        var hr = swapChain.ResizeBuffers(0, width, height, DXGI_FORMAT.UNKNOWN, 0);
-        checkSuccessful(hr);
+        checkSuccessful(swapChain.ResizeBuffers(0, width, height, DXGI_FORMAT.UNKNOWN, 0));
     }
 
     public void blitSharedTextureToSwapChain(int glTextureIdentifier) {
@@ -216,18 +196,10 @@ public class InteropContext implements AutoCloseable {
         }
         texture.unlock();
         try (var arena = Arena.ofConfined()) {
-            var hr = 0;
-
             if(renderTargetView == null) {
-                var backBufferPtr = arena.allocate(ADDRESS);
-                hr = swapChain.GetBuffer(0, ID3D11Texture2D.iid(), backBufferPtr);
-                checkSuccessful(hr);
-                var backBuffer = ID3D11Texture2D.wrap(backBufferPtr.get(ADDRESS, 0));
+                var backBuffer = makeResource(arena, ptr -> swapChain.GetBuffer(0, ID3D11Texture2D.iid(), ptr), ID3D11Texture2D::wrap);
 
-                var renderTargetViewPtr = arena.allocate(ADDRESS);
-                hr = device.CreateRenderTargetView(IUnknownHelper.as_raw(backBuffer), NULL, renderTargetViewPtr);
-                checkSuccessful(hr);
-                renderTargetView = ID3D11RenderTargetView.wrap(renderTargetViewPtr.get(ADDRESS, 0));
+                renderTargetView = makeResource(arena, ptr -> device.CreateRenderTargetView(IUnknownHelper.as_raw(backBuffer), NULL, ptr), ID3D11RenderTargetView::wrap);
 
                 var backBufferDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
                 backBuffer.GetDesc(backBufferDesc);
@@ -240,7 +212,6 @@ public class InteropContext implements AutoCloseable {
                 context.RSSetViewports(1, viewPort);
 
                 backBuffer.Release();
-
             }
 
             context.PSSetShaderResources(0, 1, arena.allocateFrom(ADDRESS, IUnknownHelper.as_raw(texture.textureView)));
@@ -297,10 +268,9 @@ public class InteropContext implements AutoCloseable {
         private final long interopHandle;
         private boolean locked = false;
 
+        @SuppressWarnings("SwitchStatementWithTooFewBranches")
         public SharedTexture(int glTextureIdentifier, int glTextureType, int glTextureFormat, int width, int height) {
             try (var arena = Arena.ofConfined()) {
-                var hr = 0;
-
                 var textureDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
                 D3D11_TEXTURE2D_DESC.Width(textureDesc, width);
                 D3D11_TEXTURE2D_DESC.Height(textureDesc, height);
@@ -318,16 +288,8 @@ public class InteropContext implements AutoCloseable {
                 D3D11_TEXTURE2D_DESC.CPUAccessFlags(textureDesc, 0);
                 D3D11_TEXTURE2D_DESC.MiscFlags(textureDesc, 0);
 
-                var texturePtr = arena.allocate(ADDRESS);
-                hr = device.CreateTexture2D(textureDesc, NULL, texturePtr);
-                checkSuccessful(hr);
-
-                var texture = ID3D11Texture2D.wrap(texturePtr.get(ADDRESS, 0));
-
-                var textureViewPtr = arena.allocate(ADDRESS);
-                hr = device.CreateShaderResourceView(IUnknownHelper.as_raw(texture), NULL, textureViewPtr);
-                checkSuccessful(hr);
-                textureView = ID3D11ShaderResourceView.wrap(textureViewPtr.get(ADDRESS, 0));
+                var texture = makeResource(arena, ptr -> device.CreateTexture2D(textureDesc, NULL, ptr), ID3D11Texture2D::wrap);
+                textureView = makeResource(arena, ptr -> device.CreateShaderResourceView(IUnknownHelper.as_raw(texture), NULL, ptr), ID3D11ShaderResourceView::wrap);
 
                 interopHandle = check(wglDXRegisterObjectNV(
                         interopDeviceHandle,

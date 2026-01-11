@@ -1,11 +1,7 @@
 package com.github.sidit77.perfect_presentation.client;
 
-import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.PIXELFORMATDESCRIPTOR;
-import org.lwjgl.system.windows.User32;
-import org.lwjgl.system.windows.WNDCLASSEX;
-import org.lwjgl.system.windows.WindowsLibrary;
 
 import static org.lwjgl.opengl.WGL.*;
 import static org.lwjgl.opengl.WGLARBCreateContext.*;
@@ -39,7 +35,7 @@ public class WGLContext implements AutoCloseable {
             PIXELFORMATDESCRIPTOR pfd = PIXELFORMATDESCRIPTOR.calloc(stack)
                     .nSize((short)PIXELFORMATDESCRIPTOR.SIZEOF)
                     .nVersion((short)1)
-                    .dwFlags(PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER)
+                    .dwFlags(PFD_SUPPORT_OPENGL)
                     .iPixelType(PFD_TYPE_RGBA)
                     .iLayerType(PFD_MAIN_PLANE)
                     .cColorBits((byte) 32)
