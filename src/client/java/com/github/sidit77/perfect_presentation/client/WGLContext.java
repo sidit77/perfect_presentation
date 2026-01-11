@@ -81,7 +81,7 @@ public class WGLContext implements AutoCloseable {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         wglMakeCurrent(hdc, 0);
         wglDeleteContext(hglrc);
         ReleaseDC(hwnd, hdc);

@@ -64,6 +64,9 @@ generateWindowsApi {
     constants = [
             "D3D11_SDK_VERSION"
     ]
+    enumerations = [
+            "D3D11_BIND_FLAG"
+    ]
 }
 
 processResources {

@@ -1,9 +1,17 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
+import com.github.sidit77.perfect_presentation.client.InteropContext;
 import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.platform.TextureUtil;
+import com.mojang.blaze3d.systems.RenderSystem;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Unique;
+
+import static com.mojang.blaze3d.platform.GlConst.*;
+
 
 @Mixin(MainTarget.class)
 public class MainTargetMixin extends RenderTarget {
@@ -20,45 +28,6 @@ public class MainTargetMixin extends RenderTarget {
         createBuffers(i, j, false);
     }
 
-    /*
-    @Override
-    public void bindWrite(boolean bl) {
-        if (!RenderSystem.isOnRenderThread()) {
-            RenderSystem.recordRenderCall(() -> this._bindWrite(bl));
-        } else {
-            this._bindWrite(bl);
-        }
-    }
-
-    @Unique
-    private void _bindWrite(boolean bl) {
-        RenderSystem.assertOnRenderThreadOrInit();
-        GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, this.frameBufferId);
-        if (bl) {
-            GlStateManager._viewport(0, 0, this.viewWidth, this.viewHeight);
-        }
-    }
-
-    @Override
-    public void resize(int i, int j, boolean bl) {
-        if (!RenderSystem.isOnRenderThread()) {
-            RenderSystem.recordRenderCall(() -> this._resize(i, j, bl));
-        } else {
-            this._resize(i, j, bl);
-        }
-    }
-
-    @Unique
-    private void _resize(int i, int j, boolean bl) {
-        RenderSystem.assertOnRenderThreadOrInit();
-        GlStateManager._enableDepthTest();
-        if (this.frameBufferId >= 0) {
-            this.destroyBuffers();
-        }
-
-        this.createBuffers(i, j, bl);
-        GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
 
     @Override
     public void destroyBuffers() {
@@ -71,7 +40,7 @@ public class MainTargetMixin extends RenderTarget {
         }
 
         if (this.colorTextureId > -1) {
-            PerfectPresentationNativeLibrary.deleteSharedTexture(this.colorTextureId);
+            InteropContext.getCurrentContext().deallocateSharedTexture(this.colorTextureId);
             TextureUtil.releaseTextureId(this.colorTextureId);
             this.colorTextureId = -1;
         }
@@ -110,7 +79,7 @@ public class MainTargetMixin extends RenderTarget {
             GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             //GlStateManager._texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this.width, this.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
-            PerfectPresentationNativeLibrary.createSharedTexture(this.colorTextureId, this.width, this.height);
+            InteropContext.getCurrentContext().allocateSharedTexture(this.colorTextureId, GL_TEXTURE_2D, GL_RGBA8, this.width, this.height);
             GlStateManager._glBindFramebuffer(GL_FRAMEBUFFER, this.frameBufferId);
             GlStateManager._glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this.colorTextureId, 0);
             if (this.useDepth) {
@@ -140,7 +109,8 @@ public class MainTargetMixin extends RenderTarget {
         RenderSystem.assertOnRenderThread();
         if(w != this.width || h != this.height || !noBlend)
             System.out.println("Warning: blitToScreen called with incorrect dimensions!");
-        PerfectPresentationNativeLibrary.blitSharedTextureToScreen(this.colorTextureId);
+        super.blitToScreen(w, h, noBlend);
+        //PerfectPresentationNativeLibrary.blitSharedTextureToScreen(this.colorTextureId);
     }
-    */
+
 }
