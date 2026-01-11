@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 plugins {
     id 'fabric-loom' version '1.13.6'
     id 'maven-publish'
@@ -62,6 +64,23 @@ generateWindowsApi {
             "D3D11_BIND_FLAG",
             "D3D_PRIMITIVE_TOPOLOGY"
     ]
+
+
+    doLast {
+        //Minecraft launchers tend to mess with java.library.path to we change to import path to be absolute
+        //Unfortunately, this should also mess with other tool that rely on dll replacements to inject themself
+        //
+        //Also we need to wide the access on internal pointer of a wrapped COM object because we can't use it otherwise
+        def libPattern = Pattern.compile('System\\.loadLibrary\\(\\"(.+)\\"\\);', Pattern.MULTILINE)
+        outputDirectory.getAsFileTree().matching {
+            include '**/*.java'
+        }.each { file ->
+            file.text = libPattern
+                    .matcher(file.text)
+                    .replaceAll('System.load(java.nio.file.Path.of(System.getenv("SystemRoot"), "System32", "$1.dll").toString());')
+                    .replaceAll("protected final MemorySegment comObject;", "public final MemorySegment comObject;")
+        }
+    }
 }
 
 processResources {

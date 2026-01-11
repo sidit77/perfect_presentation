@@ -15,7 +15,6 @@ import windows.win32.graphics.dxgi.common.DXGI_ALPHA_MODE;
 import windows.win32.graphics.dxgi.common.DXGI_FORMAT;
 import windows.win32.graphics.dxgi.common.DXGI_SAMPLE_DESC;
 import windows.win32.system.com.IUnknown;
-import windows.win32.system.com.IUnknownHelper;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
@@ -95,7 +94,7 @@ public class InteropContext implements AutoCloseable {
                 this.context = ID3D11DeviceContext.wrap(contextPtr.get(ADDRESS, 0));
             }
 
-            this.interopDeviceHandle = check(wglDXOpenDeviceNV(IUnknownHelper.as_raw(device).address()));
+            this.interopDeviceHandle = check(wglDXOpenDeviceNV(asRaw(device).address()));
 
             var factory = makeResource(arena, ptr -> CreateDXGIFactory1(IDXGIFactory2.iid(), ptr), IDXGIFactory2::wrap);
 
@@ -112,7 +111,7 @@ public class InteropContext implements AutoCloseable {
 
             var swapChain1 = makeResource(arena,
                     ptr -> factory.CreateSwapChainForHwnd(
-                            IUnknownHelper.as_raw(device),
+                            asRaw(device),
                             MemorySegment.ofAddress(hwnd),
                             swapChainDesc,
                             NULL,
@@ -151,10 +150,10 @@ public class InteropContext implements AutoCloseable {
             var samplerState = makeResource(arena, ptr -> device.CreateSamplerState(samplerStateDesc, ptr), ID3D11SamplerState::wrap);
 
             context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            context.VSSetShader(IUnknownHelper.as_raw(vertexShader), NULL, 0);
-            context.RSSetState(IUnknownHelper.as_raw(rasterizerState));
-            context.PSSetShader(IUnknownHelper.as_raw(pixelShader), NULL, 0);
-            context.PSSetSamplers(0, 1, arena.allocateFrom(ADDRESS, IUnknownHelper.as_raw(samplerState)));
+            context.VSSetShader(asRaw(vertexShader), NULL, 0);
+            context.RSSetState(asRaw(rasterizerState));
+            context.PSSetShader(asRaw(pixelShader), NULL, 0);
+            context.PSSetSamplers(0, 1, arena.allocateFrom(ADDRESS, asRaw(samplerState)));
 
             vertexShader.Release();
             pixelShader.Release();
@@ -163,6 +162,13 @@ public class InteropContext implements AutoCloseable {
         }
     }
 
+    private static MemorySegment asRaw(IUnknown obj) {
+        if(obj instanceof IUnknown.$DOWNCALL downcall) {
+            return downcall.comObject;
+        }
+        throw new IllegalArgumentException("Not a native IUnknown object");
+    }
+    
     private static ID3DBlob compileShaderSource(Arena arena, MemorySegment source, String entryPoint, String target) {
         var vertexShaderBlobPtr = arena.allocate(ADDRESS);
         var vertexShaderErrorBlobPtr = arena.allocateFrom(ADDRESS, NULL);
@@ -245,7 +251,7 @@ public class InteropContext implements AutoCloseable {
             if(renderTargetView == null) {
                 var backBuffer = makeResource(arena, ptr -> swapChain.GetBuffer(0, ID3D11Texture2D.iid(), ptr), ID3D11Texture2D::wrap);
 
-                renderTargetView = makeResource(arena, ptr -> device.CreateRenderTargetView(IUnknownHelper.as_raw(backBuffer), NULL, ptr), ID3D11RenderTargetView::wrap);
+                renderTargetView = makeResource(arena, ptr -> device.CreateRenderTargetView(asRaw(backBuffer), NULL, ptr), ID3D11RenderTargetView::wrap);
 
                 var backBufferDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
                 backBuffer.GetDesc(backBufferDesc);
@@ -260,8 +266,8 @@ public class InteropContext implements AutoCloseable {
                 backBuffer.Release();
             }
 
-            context.PSSetShaderResources(0, 1, arena.allocateFrom(ADDRESS, IUnknownHelper.as_raw(texture.textureView)));
-            context.OMSetRenderTargets(1, arena.allocateFrom(ADDRESS, IUnknownHelper.as_raw(renderTargetView)), NULL);
+            context.PSSetShaderResources(0, 1, arena.allocateFrom(ADDRESS, asRaw(texture.textureView)));
+            context.OMSetRenderTargets(1, arena.allocateFrom(ADDRESS, asRaw(renderTargetView)), NULL);
             context.Draw(3, 0);
 
         }
@@ -336,11 +342,11 @@ public class InteropContext implements AutoCloseable {
                 D3D11_TEXTURE2D_DESC.MiscFlags(textureDesc, 0);
 
                 var texture = makeResource(arena, ptr -> device.CreateTexture2D(textureDesc, NULL, ptr), ID3D11Texture2D::wrap);
-                textureView = makeResource(arena, ptr -> device.CreateShaderResourceView(IUnknownHelper.as_raw(texture), NULL, ptr), ID3D11ShaderResourceView::wrap);
+                textureView = makeResource(arena, ptr -> device.CreateShaderResourceView(asRaw(texture), NULL, ptr), ID3D11ShaderResourceView::wrap);
 
                 interopHandle = check(wglDXRegisterObjectNV(
                         interopDeviceHandle,
-                        IUnknownHelper.as_raw(texture).address(),
+                        asRaw(texture).address(),
                         glTextureIdentifier,
                         glTextureType,
                         WGL_ACCESS_WRITE_DISCARD_NV));
