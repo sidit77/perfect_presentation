@@ -1,6 +1,7 @@
 package com.github.sidit77.perfect_presentation.client;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 
 public class PerfectPresentationClient implements ClientModInitializer {
 
@@ -10,7 +11,7 @@ public class PerfectPresentationClient implements ClientModInitializer {
      */
 
     //public static Config config = new Config(2.0f, true);
-    public static Config config = new Config(1.0f, false);
+    public static Config config = new Config(1.0f, FabricLoader.getInstance().isDevelopmentEnvironment());
 
     @Override
     public void onInitializeClient() {

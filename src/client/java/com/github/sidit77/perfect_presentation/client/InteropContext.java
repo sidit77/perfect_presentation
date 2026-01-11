@@ -212,6 +212,10 @@ public class InteropContext implements AutoCloseable {
     }
 
     public void setSyncInterval(int syncInterval) {
+        if(syncInterval < 0) {
+            LOGGER.warn("Sync interval cannot be negative, clamping to 0");
+            syncInterval = 0;
+        }
         this.syncInterval = syncInterval;
     }
 
