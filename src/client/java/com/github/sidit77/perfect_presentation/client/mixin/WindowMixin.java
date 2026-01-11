@@ -81,7 +81,7 @@ public abstract class WindowMixin implements InteropContextProvider {
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
     )
     void proxySwapInterval(int interval) {
-        //TODO implement setting the swap interval
+        interopContext.setSyncInterval(interval);
     }
 
     @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))

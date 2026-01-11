@@ -74,9 +74,6 @@ public class WGLContext implements AutoCloseable {
             wglDeleteContext(tempContext);
         }
 
-
-
-        //org.lwjgl.opengl.WGLNVDXInterop.wglDXOpenDeviceNV(hwnd);
     }
 
     public void makeCurrent() {

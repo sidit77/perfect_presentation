@@ -17,6 +17,8 @@ import windows.win32.system.com.IUnknownHelper;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -46,16 +48,19 @@ public class InteropContext implements AutoCloseable {
         return context;
     }
 
+    private static final int SWAP_CHAIN_FLAGS = DXGI_SWAP_CHAIN_FLAG.ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG.FRAME_LATENCY_WAITABLE_OBJECT;
+
     private final WGLContext openglContext;
 
     private final long interopDeviceHandle;
 
     private final ID3D11Device device;
     private final ID3D11DeviceContext context;
-    private final IDXGISwapChain1 swapChain;
+    private final IDXGISwapChain2 swapChain;
     private @Nullable ID3D11RenderTargetView renderTargetView = null;
 
     private final Map<Integer, SharedTexture> sharedTextures = new HashMap<>();
+    private int syncInterval = 1;
 
     public InteropContext(long hwnd, ContextCreationFlags flags) {
         openglContext = new WGLContext(flags);
@@ -95,9 +100,9 @@ public class InteropContext implements AutoCloseable {
             DXGI_SWAP_CHAIN_DESC1.Scaling(swapChainDesc, DXGI_SCALING.NONE);
             DXGI_SWAP_CHAIN_DESC1.SwapEffect(swapChainDesc, DXGI_SWAP_EFFECT.FLIP_DISCARD);
             DXGI_SWAP_CHAIN_DESC1.AlphaMode(swapChainDesc, DXGI_ALPHA_MODE.UNSPECIFIED);
-            DXGI_SWAP_CHAIN_DESC1.Flags(swapChainDesc, 0);
+            DXGI_SWAP_CHAIN_DESC1.Flags(swapChainDesc, SWAP_CHAIN_FLAGS);
 
-            swapChain = makeResource(arena,
+            var swapChain1 = makeResource(arena,
                     ptr -> factory.CreateSwapChainForHwnd(
                             IUnknownHelper.as_raw(device),
                             MemorySegment.ofAddress(hwnd),
@@ -107,6 +112,9 @@ public class InteropContext implements AutoCloseable {
                             ptr),
                     IDXGISwapChain1::wrap);
 
+            swapChain = comCast(arena, swapChain1, IDXGISwapChain2.class);
+
+            swapChain1.Release();
             factory.Release();
 
             var shaderSource = arena.allocateFrom(BLIT_SHADER_SOURCE, UTF_8);
@@ -172,13 +180,32 @@ public class InteropContext implements AutoCloseable {
         return wrapper.apply(ptr.get(ADDRESS, 0));
     }
 
+    public <T extends IUnknown> T comCast(Arena arena, IUnknown resource, Class<T> clazz){
+        try {
+            Method iidMethod = clazz.getMethod("iid");
+            MemorySegment iid = (MemorySegment) iidMethod.invoke(null);
+
+            Method wrapMethod = clazz.getMethod("wrap", MemorySegment.class);
+
+            var ptr = arena.allocate(ADDRESS);
+            checkSuccessful(resource.QueryInterface(iid, ptr));
+            return clazz.cast(wrapMethod.invoke(null, ptr.get(ADDRESS, 0)));
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void makeCurrent() {
         openglContext.makeCurrent();
         CURRENT_CONTEXT.set(this);
     }
 
+    public void setSyncInterval(int syncInterval) {
+        this.syncInterval = syncInterval;
+    }
+
     public void swapChainPresent() {
-        checkSuccessful(swapChain.Present(1, 0));
+        checkSuccessful(swapChain.Present(syncInterval, syncInterval == 0 ? DXGI_PRESENT.ALLOW_TEARING : 0));
     }
 
     public void resizeSwapChain(int width, int height) {
@@ -186,7 +213,7 @@ public class InteropContext implements AutoCloseable {
             renderTargetView.Release();
             renderTargetView = null;
         }
-        checkSuccessful(swapChain.ResizeBuffers(0, width, height, DXGI_FORMAT.UNKNOWN, 0));
+        checkSuccessful(swapChain.ResizeBuffers(0, width, height, DXGI_FORMAT.UNKNOWN, SWAP_CHAIN_FLAGS));
     }
 
     public void blitSharedTextureToSwapChain(int glTextureIdentifier) {
