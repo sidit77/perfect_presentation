@@ -1,4 +1,14 @@
 import java.util.regex.Pattern
+import proguard.gradle.ProGuardTask
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.guardsquare:proguard-gradle:7.8.2'
+    }
+}
 
 plugins {
     id 'fabric-loom' version '1.13.6'
@@ -100,7 +110,7 @@ processResources {
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
     inputs.property "loader_version", project.loader_version
-    filteringCharset "UTF-8"
+    filteringCharset = "UTF-8"
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
@@ -145,6 +155,25 @@ jar {
     from("LICENSE") {
         rename { "${it}_${project.archivesBaseName}" }
     }
+}
+
+ext.baseCoordinates = "${project.name}-${project.version}"
+tasks.register('proguard', ProGuardTask) {
+    configuration file('proguard.pro')
+
+    injars(tasks.named('remapJar').flatMap { it.archiveFile })
+
+    libraryjars "${System.getProperty('java.home')}/jmods/java.base.jmod", jarfilter: '!**.jar', filter: '!module-info.class'
+
+    configurations.compileClasspath.each { file ->
+        if (file.exists()) {
+            libraryjars file, filter: '!module-info.class'
+        }
+    }
+
+    verbose
+
+    outjars(layout.buildDirectory.file("libs/${baseCoordinates}-minified.jar"))
 }
 
 // configure the maven publication
