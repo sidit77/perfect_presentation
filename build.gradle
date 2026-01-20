@@ -72,12 +72,27 @@ generateWindowsApi {
         //
         //Also we need to wide the access on internal pointer of a wrapped COM object because we can't use it otherwise
         def libPattern = Pattern.compile('System\\.loadLibrary\\(\\"(.+)\\"\\);', Pattern.MULTILINE)
+        def emptyStaticPattern = Pattern.compile('static \\{\\s+\\}', Pattern.MULTILINE)
         outputDirectory.getAsFileTree().matching {
             include '**/*.java'
         }.each { file ->
-            file.text = libPattern
-                    .matcher(file.text)
-                    .replaceAll('System.load(java.nio.file.Path.of(System.getenv("SystemRoot"), "System32", "$1.dll").toString());')
+            def text = file.text
+            def libName = libPattern
+                    .matcher(text)
+                    .results()
+                    .map { it.group(1) }
+                    .reduce { throw RuntimeException("More than one library") }
+                    .orElse(null)
+            if(libName != null) {
+                text = text
+                        .replace("System.loadLibrary(\"${libName}\");", "")
+                        .replace(
+                                "SymbolLookup.loaderLookup();",
+                                "SymbolLookup.libraryLookup(\"${libName}.dll\", Arena.global());"
+                        )
+                        .replaceAll(emptyStaticPattern, "")
+            }
+            file.text = text
                     .replaceAll("protected final MemorySegment comObject;", "public final MemorySegment comObject;")
         }
     }
