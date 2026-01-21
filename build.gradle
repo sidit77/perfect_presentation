@@ -14,12 +14,12 @@ base {
 }
 
 loom {
-    splitEnvironmentSourceSets()
+    //splitEnvironmentSourceSets()
 
     mods {
         "perfect_presentation" {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
+            //sourceSet sourceSets.client
         }
     }
 }
@@ -67,9 +67,7 @@ generateWindowsApi {
 
 
     doLast {
-        //Minecraft launchers tend to mess with java.library.path to we change to import path to be absolute
-        //Unfortunately, this should also mess with other tool that rely on dll replacements to inject themself
-        //
+        //Minecraft launchers tend to mess with java.library.path to we can't load libraries via System.loadLibrary
         //Also we need to wide the access on internal pointer of a wrapped COM object because we can't use it otherwise
         def libPattern = Pattern.compile('System\\.loadLibrary\\(\\"(.+)\\"\\);', Pattern.MULTILINE)
         def emptyStaticPattern = Pattern.compile('static \\{\\s+\\}', Pattern.MULTILINE)
@@ -136,7 +134,7 @@ java {
 }
 
 sourcesJar {
-    dependsOn generateWindowsApi, generateClientWindowsApi
+    dependsOn generateWindowsApi
 }
 
 remapSourcesJar {
