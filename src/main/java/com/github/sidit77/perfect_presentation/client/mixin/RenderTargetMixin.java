@@ -20,7 +20,7 @@ public class RenderTargetMixin {
     protected int colorTextureId;
 
     @WrapOperation(
-            method = "createBuffers(IIZ)V",
+            method = "createBuffers(II)V",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_texImage2D(IIIIIIIILjava/nio/IntBuffer;)V", ordinal = 1)
     )
     void createInteropColorBuffer(int target, int level, int internalFormat, int width, int height, int border, int format, int type, IntBuffer data, Operation<Void> original) {

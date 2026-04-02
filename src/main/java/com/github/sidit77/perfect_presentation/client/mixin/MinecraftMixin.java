@@ -6,6 +6,7 @@ import com.github.sidit77.perfect_presentation.client.PerfectPresentationClient;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
@@ -18,6 +19,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
@@ -27,15 +29,15 @@ public class MinecraftMixin {
     @NotNull
     private Window window;
 
-    @Shadow
-    private ProfilerFiller profiler;
+    //@Shadow
+    //private ProfilerFiller profiler;
 
     @Unique
     private InteropContext getInteropContext() {
         return ((InteropContextProvider)(Object) window).prefect_presentation$getInteropContext();
     }
 
-    @Inject(method = "resizeDisplay", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;resize(IIZ)V"))
+    @Inject(method = "resizeDisplay", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;resize(II)V"))
     void resizeSwapChain(CallbackInfo ci) {
         getInteropContext().resizeSwapChain(window.getWidth(), window.getHeight());
     }
@@ -44,10 +46,9 @@ public class MinecraftMixin {
             method = "runTick(Z)V",
             at = @At(value = "CONSTANT", args = "stringValue=render")
     )
-    void waitForSwapChain(boolean bl, CallbackInfo ci) {
-        profiler.push("vsync");
+    void waitForSwapChain(boolean bl, CallbackInfo ci, @Local ProfilerFiller profiler) {
+        profiler.popPush("vsync");
         getInteropContext().waitForSwapChainSignal();
-        profiler.pop();
     }
 
     @WrapOperation(
@@ -60,26 +61,10 @@ public class MinecraftMixin {
 
     @Inject(
             method = "runTick(Z)V",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getFramerateLimit()I")
+            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/FramerateLimitTracker;getFramerateLimit()I")
     )
-    void improveUpdateDisplayTimings(boolean bl, CallbackInfo ci) {
+    void improveUpdateDisplayTimings(boolean bl, CallbackInfo ci, @Local ProfilerFiller profiler) {
         profiler.popPush("framerateLimit");
-    }
-
-    @ModifyExpressionValue(
-            method = "renderFpsMeter(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/util/profiling/ProfileResults;)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/Window;getWidth()I")
-    )
-    int scaleProfilePieWidth(int original) {
-        return (int)((double)original / PerfectPresentationClient.config.debugPieScale());
-    }
-
-    @ModifyExpressionValue(
-            method = "renderFpsMeter(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/util/profiling/ProfileResults;)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/Window;getHeight()I")
-    )
-    int scaleProfilePieHeight(int original) {
-        return (int)((double)original / PerfectPresentationClient.config.debugPieScale());
     }
 
 }

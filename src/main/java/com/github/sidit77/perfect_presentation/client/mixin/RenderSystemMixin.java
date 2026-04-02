@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public class RenderSystemMixin {
 
     @Redirect(
-            method = "flipFrame(J)V",
+            method = "flipFrame(JLcom/mojang/blaze3d/TracyFrameCapture;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapBuffers(J)V")
     )
     private static void proxySwapBuffers(long window) {

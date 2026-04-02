@@ -12,7 +12,7 @@ public class MainTargetMixin {
 
     @WrapOperation(method = "<init>(II)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/MainTarget;createFrameBuffer(II)V"))
     void delegateBufferCreation(MainTarget instance, int i, int j, Operation<Void> original) {
-        instance.createBuffers(i, j, false);
+        instance.createBuffers(i, j);
     }
 
 }

@@ -11,13 +11,13 @@ public class PerfectPresentationClient implements ClientModInitializer {
      */
 
     //public static Config config = new Config(2.0f, true);
-    public static Config config = new Config(1.0f, FabricLoader.getInstance().isDevelopmentEnvironment());
+    public static Config config = new Config(FabricLoader.getInstance().isDevelopmentEnvironment());
 
     @Override
     public void onInitializeClient() {
 
     }
 
-    public record Config(float debugPieScale, boolean useDxDebugLayer) { }
+    public record Config(boolean useDxDebugLayer) { }
 
 }
