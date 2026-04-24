@@ -45,12 +45,8 @@ import static windows.win32.system.threading.Apis.WaitForSingleObject;
 public class InteropContext implements AutoCloseable {
 
     private static final ThreadLocal<InteropContext> CURRENT_CONTEXT = new ThreadLocal<>();
-    public static InteropContext getCurrentContext() {
-        var context = CURRENT_CONTEXT.get();
-        if(context == null) {
-            throw new IllegalStateException("No context bound to the current thread");
-        }
-        return context;
+    public static @Nullable InteropContext getCurrentContext() {
+        return CURRENT_CONTEXT.get();
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(InteropContext.class);

@@ -7,6 +7,11 @@ public class PerfectPresentationClient implements ClientModInitializer {
 
     /*
     TODO:
+        - Fix VSync
+        - Context Creation Flags
+        - Better integrate shared textures
+            - Also set the debug name for the directx texture
+        - Remove/Simplify InteropContext
         - Render resolution scale?
      */
 
