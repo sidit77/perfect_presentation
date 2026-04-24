@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import static com.github.sidit77.perfect_presentation.client.WinError.checkSuccessful;
-import static com.mojang.blaze3d.platform.GlConst.GL_RGBA8;
+import static com.mojang.blaze3d.opengl.GlConst.GL_RGBA8;
 import static java.lang.foreign.MemorySegment.NULL;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.nio.charset.StandardCharsets.*;

@@ -6,6 +6,7 @@ import com.github.sidit77.perfect_presentation.client.InteropContextProvider;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWNativeWin32;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -30,7 +31,7 @@ public abstract class WindowMixin implements InteropContextProvider {
     @Unique
     private InteropContext interopContext;
 
-
+    /*
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwWindowHint(II)V")
@@ -51,6 +52,8 @@ public abstract class WindowMixin implements InteropContextProvider {
             default -> glfwWindowHint(hint, value);
         }
     }
+     */
+
 
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
@@ -58,15 +61,15 @@ public abstract class WindowMixin implements InteropContextProvider {
     )
     long setupInteropContext(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
         glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        //glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         var window = original.call(width, height, title, 0L, share);
 
-        //TODO verify that we're on Windows
-        var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
-        interopContext = new InteropContext(hwnd, contextCreationFlags);
+        //var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
+        //interopContext = new InteropContext(hwnd, contextCreationFlags);
         return window;
     }
 
+    /*
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
@@ -74,7 +77,9 @@ public abstract class WindowMixin implements InteropContextProvider {
     void proxyMakeCurrent(long window, Operation<Void> original) {
         interopContext.makeCurrent();
     }
+     */
 
+    /*
     @WrapOperation(
             method = "updateVsync(Z)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
@@ -82,11 +87,12 @@ public abstract class WindowMixin implements InteropContextProvider {
     void proxySwapInterval(int interval, Operation<Void> original) {
         interopContext.setSyncInterval(interval);
     }
+     */
 
     @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
     void replace_fullscreen_with_borderless_window(long window, long monitor, int xpos, int ypos, int width, int height, int refreshRate, Operation<Void> original) {
         glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
-        original.call(window, 0L, xpos, ypos, width, height, -1);
+        original.call(window, 0L, xpos, ypos, width, height + 1, -1);
     }
 
     @Inject(method = "setMode", at = @At(value = "INVOKE", ordinal = 1, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
@@ -94,10 +100,13 @@ public abstract class WindowMixin implements InteropContextProvider {
         glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
     }
 
+    /*
     @Inject(method = "close", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwDestroyWindow(J)V"))
     void destroyInteropContext(CallbackInfo ci) {
         interopContext.close();
     }
+
+     */
 
     @Override
     public InteropContext prefect_presentation$getInteropContext() {

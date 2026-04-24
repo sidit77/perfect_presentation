@@ -16,6 +16,7 @@ import java.nio.IntBuffer;
 @Mixin(RenderTarget.class)
 public class RenderTargetMixin {
 
+    /*
     @Shadow
     protected int colorTextureId;
 
@@ -40,5 +41,6 @@ public class RenderTargetMixin {
             InteropContext.getCurrentContext().deallocateSharedTexture(this.colorTextureId);
         }
     }
+     */
 
 }

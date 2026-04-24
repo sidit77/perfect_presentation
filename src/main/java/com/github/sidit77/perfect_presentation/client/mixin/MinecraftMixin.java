@@ -37,6 +37,7 @@ public class MinecraftMixin {
         return ((InteropContextProvider)(Object) window).prefect_presentation$getInteropContext();
     }
 
+    /*
     @Inject(method = "resizeDisplay", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;resize(II)V"))
     void resizeSwapChain(CallbackInfo ci) {
         getInteropContext().resizeSwapChain(window.getWidth(), window.getHeight());
@@ -58,6 +59,8 @@ public class MinecraftMixin {
     void blitWithDirectX(RenderTarget instance, int i, int j, Operation<Void> original) {
         getInteropContext().blitSharedTextureToSwapChain(instance.getColorTextureId());
     }
+
+     */
 
     @Inject(
             method = "runTick(Z)V",
