@@ -1,8 +1,9 @@
 package com.github.sidit77.perfect_presentation.client;
 
+import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.textures.TextureFormat;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.windows.WindowsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import windows.win32.foundation.WAIT_EVENT;
@@ -22,15 +23,15 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Function;
 
 import static com.github.sidit77.perfect_presentation.client.WinError.checkSuccessful;
-import static com.mojang.blaze3d.opengl.GlConst.GL_RGBA8;
+import static com.mojang.blaze3d.opengl.GlConst.*;
+import static com.mojang.blaze3d.opengl.GlConst.GL_TEXTURE_2D;
 import static java.lang.foreign.MemorySegment.NULL;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.nio.charset.StandardCharsets.*;
+import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.WGLNVDXInterop.*;
 import static org.lwjgl.system.Checks.check;
 import static windows.win32.foundation.Apis.CloseHandle;
@@ -62,7 +63,6 @@ public class InteropContext implements AutoCloseable {
     private final WaitHandle waitHandle;
     private @Nullable ID3D11RenderTargetView renderTargetView = null;
 
-    private final Map<Integer, SharedTexture> sharedTextures = new HashMap<>();
     private int syncInterval = 1;
 
     public InteropContext(long hwnd, ContextCreationFlags flags) {
@@ -237,13 +237,9 @@ public class InteropContext implements AutoCloseable {
         checkSuccessful(swapChain.ResizeBuffers(0, width, height, DXGI_FORMAT.UNKNOWN, SWAP_CHAIN_FLAGS));
     }
 
-    public void blitSharedTextureToSwapChain(int glTextureIdentifier) {
-        var texture = sharedTextures.get(glTextureIdentifier);
-        if(texture == null) {
-            throw new IllegalStateException("No shared texture allocated for this identifier: " + glTextureIdentifier);
-        }
-        texture.unlock();
+    public void blitSharedTextureToSwapChain(SharedGlTexture texture) {
         try (var arena = Arena.ofConfined()) {
+            texture.unlock();
             if(renderTargetView == null) {
                 var backBuffer = makeResource(arena, ptr -> swapChain.GetBuffer(0, ID3D11Texture2D.iid(), ptr), ID3D11Texture2D::wrap);
 
@@ -262,38 +258,19 @@ public class InteropContext implements AutoCloseable {
                 backBuffer.Release();
             }
 
-            context.PSSetShaderResources(0, 1, arena.allocateFrom(ADDRESS, asRaw(texture.textureView)));
+            context.PSSetShaderResources(0, 1, arena.allocateFrom(ADDRESS, asRaw(texture.getTextureView())));
             context.OMSetRenderTargets(1, arena.allocateFrom(ADDRESS, asRaw(renderTargetView)), NULL);
             context.Draw(3, 0);
 
+        } finally {
+            texture.lock();
         }
-        texture.lock();
-    }
-
-    public void allocateSharedTexture(int glTextureIdentifier, int glTextureType, int glTextureFormat, int width, int height) {
-        if(sharedTextures.containsKey(glTextureIdentifier))
-            throw new IllegalStateException("Shared texture already allocated for this identifier: " + glTextureIdentifier);
-
-        var texture = new SharedTexture(glTextureIdentifier, glTextureType, glTextureFormat, width, height);
-        texture.lock();
-        sharedTextures.put(glTextureIdentifier, texture);
-    }
-
-    public void deallocateSharedTexture(int glTextureIdentifier) {
-        var texture = sharedTextures.remove(glTextureIdentifier);
-        if(texture == null)
-            throw new IllegalStateException("No shared texture allocated for this identifier: " + glTextureIdentifier);
-        texture.close();
     }
 
     @Override
     public void close() {
+        System.out.println("Closing interop context");
         context.ClearState();
-
-        for (var texture : sharedTextures.values()) {
-            texture.close();
-        }
-        sharedTextures.clear();
 
         if (renderTargetView != null) {
             renderTargetView.Release();
@@ -311,88 +288,63 @@ public class InteropContext implements AutoCloseable {
         openglContext.close();
     }
 
-    public class SharedTexture implements AutoCloseable {
+    public SharedGlTexture createSharedTexture(@Nullable String debugName, TextureFormat textureFormat, int width, int height) {
+        try (var arena = Arena.ofConfined()) {
+            var textureDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
+            D3D11_TEXTURE2D_DESC.Width(textureDesc, width);
+            D3D11_TEXTURE2D_DESC.Height(textureDesc, height);
+            D3D11_TEXTURE2D_DESC.MipLevels(textureDesc, 1);
+            D3D11_TEXTURE2D_DESC.ArraySize(textureDesc, 1);
+            D3D11_TEXTURE2D_DESC.Format(textureDesc, switch (textureFormat) {
+                case RGBA8 -> DXGI_FORMAT.R8G8B8A8_UNORM;
+                case RED8 -> DXGI_FORMAT.R8_UNORM;
+                case DEPTH32 -> DXGI_FORMAT.D32_FLOAT;
+            });
+            DXGI_SAMPLE_DESC.Count(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 1);
+            DXGI_SAMPLE_DESC.Quality(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 0);
+            D3D11_TEXTURE2D_DESC.Usage(textureDesc, D3D11_USAGE.DEFAULT);
+            D3D11_TEXTURE2D_DESC.BindFlags(textureDesc,
+                    D3D11_BIND_FLAG.D3D11_BIND_RENDER_TARGET | D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE);
+            D3D11_TEXTURE2D_DESC.CPUAccessFlags(textureDesc, 0);
+            D3D11_TEXTURE2D_DESC.MiscFlags(textureDesc, 0);
 
-        private final ID3D11ShaderResourceView textureView;
-        private final long interopHandle;
-        private boolean locked = false;
+            var texture = makeResource(arena, ptr -> device.CreateTexture2D(textureDesc, NULL, ptr), ID3D11Texture2D::wrap);
+            var textureView = makeResource(arena, ptr -> device.CreateShaderResourceView(asRaw(texture), NULL, ptr), ID3D11ShaderResourceView::wrap);
 
-        @SuppressWarnings("SwitchStatementWithTooFewBranches")
-        public SharedTexture(int glTextureIdentifier, int glTextureType, int glTextureFormat, int width, int height) {
-            try (var arena = Arena.ofConfined()) {
-                var textureDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
-                D3D11_TEXTURE2D_DESC.Width(textureDesc, width);
-                D3D11_TEXTURE2D_DESC.Height(textureDesc, height);
-                D3D11_TEXTURE2D_DESC.MipLevels(textureDesc, 1);
-                D3D11_TEXTURE2D_DESC.ArraySize(textureDesc, 1);
-                D3D11_TEXTURE2D_DESC.Format(textureDesc, switch (glTextureFormat) {
-                    case GL_RGBA8 -> DXGI_FORMAT.R8G8B8A8_UNORM;
-                    default -> throw new IllegalStateException("Unexpected value: " + glTextureFormat);
-                });
-                DXGI_SAMPLE_DESC.Count(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 1);
-                DXGI_SAMPLE_DESC.Quality(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 0);
-                D3D11_TEXTURE2D_DESC.Usage(textureDesc, D3D11_USAGE.DEFAULT);
-                D3D11_TEXTURE2D_DESC.BindFlags(textureDesc,
-                        D3D11_BIND_FLAG.D3D11_BIND_RENDER_TARGET | D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE);
-                D3D11_TEXTURE2D_DESC.CPUAccessFlags(textureDesc, 0);
-                D3D11_TEXTURE2D_DESC.MiscFlags(textureDesc, 0);
-
-                var texture = makeResource(arena, ptr -> device.CreateTexture2D(textureDesc, NULL, ptr), ID3D11Texture2D::wrap);
-                textureView = makeResource(arena, ptr -> device.CreateShaderResourceView(asRaw(texture), NULL, ptr), ID3D11ShaderResourceView::wrap);
-
-                interopHandle = check(wglDXRegisterObjectNV(
-                        interopDeviceHandle,
-                        asRaw(texture).address(),
-                        glTextureIdentifier,
-                        glTextureType,
-                        WGL_ACCESS_WRITE_DISCARD_NV));
-
-                texture.Release();
-
-            }
-        }
-
-        public void lock() {
-            if (locked) {
-                LOGGER.warn("Shared texture is already locked");
-                return;
+            GlStateManager.clearGlErrors();
+            int texId = GlStateManager._genTexture();
+            if (debugName == null) {
+                debugName = String.valueOf(texId);
             }
 
-            try(var memStack = MemoryStack.stackPush()) {
-                if(!wglDXLockObjectsNV(interopDeviceHandle, memStack.callocPointer(1).put(0, interopHandle))) {
-                    WindowsUtil.windowsThrowException("Failed to lock the shared texture");
-                }
+            GlStateManager._bindTexture(texId);
+            GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+            GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
+            GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0);
+            if (textureFormat.hasDepthAspect()) {
+                GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, 0);
             }
 
-            locked = true;
-        }
+            var interopHandle = check(wglDXRegisterObjectNV(
+                    interopDeviceHandle,
+                    asRaw(texture).address(),
+                    texId,
+                    GL_TEXTURE_2D,
+                    WGL_ACCESS_WRITE_DISCARD_NV));
 
-        public void unlock() {
-            if (!locked) {
-                LOGGER.warn("Shared texture is already unlocked");
-                return;
-            }
+            int m = GlStateManager._getError();
+            if (m != 0)
+                throw new IllegalStateException("OpenGL error " + m);
 
-            try(var memStack = MemoryStack.stackPush()) {
-                if(!wglDXUnlockObjectsNV(interopDeviceHandle, memStack.callocPointer(1).put(0, interopHandle))) {
-                    WindowsUtil.windowsThrowException("Failed to unlock the shared texture");
-                }
-            }
+            texture.Release();
 
-            locked = false;
-        }
+            var sharedTexture = new SharedGlTexture(textureView, interopHandle, interopDeviceHandle, debugName, textureFormat, width, height, 1, texId);
+            sharedTexture.lock();
 
-        @Override
-        public void close() {
-            if (locked) {
-                unlock();
-            }
-            if(!wglDXUnregisterObjectNV(interopDeviceHandle, interopHandle)) {
-                WindowsUtil.windowsThrowException("Failed to unregister the shared texture");
-            }
-            textureView.Release();
+            return sharedTexture;
         }
     }
+
 
     private record WaitHandle(MemorySegment handle) implements AutoCloseable {
 

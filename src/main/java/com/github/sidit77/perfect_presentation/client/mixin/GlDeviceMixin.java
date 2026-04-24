@@ -66,27 +66,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
 
     @Override
     public GpuTexture perfect_presentation$createSharedTexture(@Nullable String debugName, TextureFormat textureFormat, int width, int height) {
-        GlStateManager.clearGlErrors();
-        int texId = GlStateManager._genTexture();
-        if (debugName == null) {
-            debugName = String.valueOf(texId);
-        }
-
-        GlStateManager._bindTexture(texId);
-        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
-        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0);
-        if (textureFormat.hasDepthAspect()) {
-            GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, 0);
-        }
-
-        interopContext.allocateSharedTexture(texId, GL_TEXTURE_2D, GlConst.toGlInternalId(textureFormat), width, height);
-
-        int m = GlStateManager._getError();
-        if (m != 0)
-            throw new IllegalStateException("OpenGL error " + m);
-
-        GlTexture glTexture = new SharedGlTexture(interopContext, debugName, textureFormat, width, height, 1, texId);
+        GlTexture glTexture = interopContext.createSharedTexture(debugName, textureFormat, width, height);
         this.debugLabels.applyLabel(glTexture);
         return glTexture;
     }
@@ -107,7 +87,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     }
 
     @Override
-    public void perfect_presentation$blitSharedTextureToSwapChain(int textureIdentifier) {
-        interopContext.blitSharedTextureToSwapChain(textureIdentifier);
+    public void perfect_presentation$blitSharedTextureToSwapChain(SharedGlTexture texture) {
+        interopContext.blitSharedTextureToSwapChain(texture);
     }
 }

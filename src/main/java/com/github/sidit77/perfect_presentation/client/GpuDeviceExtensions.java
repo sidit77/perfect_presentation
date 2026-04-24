@@ -18,6 +18,6 @@ public interface GpuDeviceExtensions {
 
     void perfect_presentation$waitForSwapChainSignal();
 
-    void perfect_presentation$blitSharedTextureToSwapChain(int textureIdentifier);
+    void perfect_presentation$blitSharedTextureToSwapChain(SharedGlTexture texture);
 
 }

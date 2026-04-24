@@ -2,6 +2,8 @@ package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.mojang.blaze3d.pipeline.MainTarget;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -21,6 +23,10 @@ public class MinecraftMixin {
     @Shadow
     @NotNull
     private Window window;
+
+    @Shadow
+    @Final
+    private RenderTarget mainRenderTarget;
 
     //@Shadow
     //private ProfilerFiller profiler;
@@ -62,6 +68,14 @@ public class MinecraftMixin {
     )
     void improveUpdateDisplayTimings(boolean bl, CallbackInfo ci, @Local(name = "profilerFiller") ProfilerFiller profiler) {
         profiler.popPush("framerateLimit");
+    }
+
+    @Inject(
+            method = "close()V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/font/providers/FreeTypeUtil;destroy()V")
+    )
+    void leakingMainTargetFix(CallbackInfo ci) {
+        mainRenderTarget.destroyBuffers();
     }
 
 }
