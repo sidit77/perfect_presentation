@@ -7,9 +7,7 @@ public class PerfectPresentationClient implements ClientModInitializer {
 
     /*
     TODO:
-        - Fix VSync
         - Context Creation Flags
-        - Remove/Simplify InteropContext
         - Render resolution scale?
      */
 

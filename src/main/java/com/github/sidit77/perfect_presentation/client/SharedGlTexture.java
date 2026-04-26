@@ -64,7 +64,6 @@ public class SharedGlTexture extends GlTexture {
     @Override
     public void close() {
         if(!closed) {
-            System.out.println("Closing shared texture");
             if (locked) {
                 unlock();
             }

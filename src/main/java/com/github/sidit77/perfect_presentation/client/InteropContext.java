@@ -269,7 +269,6 @@ public class InteropContext implements AutoCloseable {
 
     @Override
     public void close() {
-        System.out.println("Closing interop context");
         context.ClearState();
 
         if (renderTargetView != null) {

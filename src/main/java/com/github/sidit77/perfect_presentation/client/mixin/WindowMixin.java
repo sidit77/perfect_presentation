@@ -1,8 +1,10 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
+import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -68,15 +70,17 @@ public abstract class WindowMixin {
     }
      */
 
-    /*
     @WrapOperation(
             method = "updateVsync(Z)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
     )
     void proxySwapInterval(int interval, Operation<Void> original) {
-        interopContext.setSyncInterval(interval);
+        if(RenderSystem.getDevice() instanceof GpuDeviceExtensions ext) {
+            ext.perfect_presentation$setSwapInterval(interval);
+        } else {
+            original.call(interval);
+        }
     }
-     */
 
     @WrapOperation(method = "setMode", at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
     void replace_fullscreen_with_borderless_window(long window, long monitor, int xpos, int ypos, int width, int height, int refreshRate, Operation<Void> original) {

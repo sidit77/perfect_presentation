@@ -90,4 +90,9 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     public void perfect_presentation$blitSharedTextureToSwapChain(SharedGlTexture texture) {
         interopContext.blitSharedTextureToSwapChain(texture);
     }
+
+    @Override
+    public void perfect_presentation$setSwapInterval(int interval) {
+        interopContext.setSyncInterval(interval);
+    }
 }

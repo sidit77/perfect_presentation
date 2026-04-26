@@ -20,4 +20,6 @@ public interface GpuDeviceExtensions {
 
     void perfect_presentation$blitSharedTextureToSwapChain(SharedGlTexture texture);
 
+    void perfect_presentation$setSwapInterval(int interval);
+
 }
