@@ -2,8 +2,10 @@ package com.github.sidit77.perfect_presentation.client;
 
 import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.opengl.GPU_DEVICE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import windows.win32.foundation.WAIT_EVENT;
@@ -287,7 +289,7 @@ public class InteropContext implements AutoCloseable {
         openglContext.close();
     }
 
-    public SharedGlTexture createSharedTexture(@Nullable String debugName, TextureFormat textureFormat, int width, int height) {
+    public SharedGlTexture createSharedTexture(@Nullable String debugName, int usage, TextureFormat textureFormat, int width, int height) {
         try (var arena = Arena.ofConfined()) {
             var textureDesc = D3D11_TEXTURE2D_DESC.allocate(arena);
             D3D11_TEXTURE2D_DESC.Width(textureDesc, width);
@@ -297,13 +299,15 @@ public class InteropContext implements AutoCloseable {
             D3D11_TEXTURE2D_DESC.Format(textureDesc, switch (textureFormat) {
                 case RGBA8 -> DXGI_FORMAT.R8G8B8A8_UNORM;
                 case RED8 -> DXGI_FORMAT.R8_UNORM;
+                case RED8I -> DXGI_FORMAT.R8_UINT;
                 case DEPTH32 -> DXGI_FORMAT.D32_FLOAT;
             });
             DXGI_SAMPLE_DESC.Count(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 1);
             DXGI_SAMPLE_DESC.Quality(D3D11_TEXTURE2D_DESC.SampleDesc(textureDesc), 0);
             D3D11_TEXTURE2D_DESC.Usage(textureDesc, D3D11_USAGE.DEFAULT);
             D3D11_TEXTURE2D_DESC.BindFlags(textureDesc,
-                    D3D11_BIND_FLAG.D3D11_BIND_RENDER_TARGET | D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE);
+                    (((usage & GpuTexture.USAGE_RENDER_ATTACHMENT) != 0) ? D3D11_BIND_FLAG.D3D11_BIND_RENDER_TARGET : 0) |
+                          (((usage & GpuTexture.USAGE_TEXTURE_BINDING) != 0) ? D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE : 0));
             D3D11_TEXTURE2D_DESC.CPUAccessFlags(textureDesc, 0);
             D3D11_TEXTURE2D_DESC.MiscFlags(textureDesc, 0);
 
@@ -337,7 +341,7 @@ public class InteropContext implements AutoCloseable {
 
             texture.Release();
 
-            var sharedTexture = new SharedGlTexture(textureView, interopHandle, interopDeviceHandle, debugName, textureFormat, width, height, 1, texId);
+            var sharedTexture = new SharedGlTexture(textureView, interopHandle, interopDeviceHandle, usage, debugName, textureFormat, width, height, 1, 1, texId);
             sharedTexture.lock();
 
             return sharedTexture;

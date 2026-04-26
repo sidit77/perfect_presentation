@@ -8,9 +8,9 @@ import java.util.function.Supplier;
 
 public interface GpuDeviceExtensions {
 
-    GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, TextureFormat textureFormat, int i, int j);
+    GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, int usage, TextureFormat textureFormat, int i, int j);
 
-    GpuTexture perfect_presentation$createSharedTexture(@Nullable String string, TextureFormat textureFormat, int i, int j);
+    GpuTexture perfect_presentation$createSharedTexture(@Nullable String string, int usage, TextureFormat textureFormat, int i, int j);
 
     void perfect_presentation$swapChainPresent();
 

@@ -21,15 +21,15 @@ public class RenderTargetMixin {
             method = "createBuffers(II)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/systems/GpuDevice;createTexture(Ljava/util/function/Supplier;Lcom/mojang/blaze3d/textures/TextureFormat;III)Lcom/mojang/blaze3d/textures/GpuTexture;",
+                    target = "Lcom/mojang/blaze3d/systems/GpuDevice;createTexture(Ljava/util/function/Supplier;ILcom/mojang/blaze3d/textures/TextureFormat;IIII)Lcom/mojang/blaze3d/textures/GpuTexture;",
                     ordinal = 1
             )
     )
-    GpuTexture createInteropColorBuffer(GpuDevice instance, @Nullable Supplier<String> stringSupplier, TextureFormat textureFormat, int i, int j, int k, Operation<GpuTexture> original) {
+    GpuTexture createInteropColorBuffer(GpuDevice instance, Supplier<String> stringSupplier, int u, TextureFormat textureFormat, int w, int h, int l, int m, Operation<GpuTexture> original) {
         if (((RenderTarget)(Object)this) instanceof MainTarget && (instance instanceof GpuDeviceExtensions ext)) {
-            return ext.perfect_presentation$createSharedTexture(stringSupplier, textureFormat, i, j);
+            return ext.perfect_presentation$createSharedTexture(stringSupplier, u, textureFormat, w, h);
         } else {
-            return original.call(instance, stringSupplier, textureFormat, i, j, k);
+            return original.call(instance, stringSupplier, u, textureFormat, w, h, l, m);
         }
     }
 

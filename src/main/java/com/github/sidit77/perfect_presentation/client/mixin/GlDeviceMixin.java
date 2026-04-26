@@ -58,13 +58,13 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
 
 
     @Override
-    public GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, TextureFormat textureFormat, int i, int j) {
-        return this.perfect_presentation$createSharedTexture(this.debugLabels.exists() && supplier != null ? supplier.get() : null, textureFormat, i, j);
+    public GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, int usage, TextureFormat textureFormat, int i, int j) {
+        return this.perfect_presentation$createSharedTexture(this.debugLabels.exists() && supplier != null ? supplier.get() : null, usage, textureFormat, i, j);
     }
 
     @Override
-    public GpuTexture perfect_presentation$createSharedTexture(@Nullable String debugName, TextureFormat textureFormat, int width, int height) {
-        GlTexture glTexture = interopContext.createSharedTexture(debugName, textureFormat, width, height);
+    public GpuTexture perfect_presentation$createSharedTexture(@Nullable String debugName, int usage, TextureFormat textureFormat, int width, int height) {
+        GlTexture glTexture = interopContext.createSharedTexture(debugName, usage, textureFormat, width, height);
         this.debugLabels.applyLabel(glTexture);
         return glTexture;
     }

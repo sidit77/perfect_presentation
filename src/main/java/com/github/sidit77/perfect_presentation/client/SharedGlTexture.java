@@ -20,8 +20,20 @@ public class SharedGlTexture extends GlTexture {
     private final long interopHandle;
     private boolean locked = false;
 
-    protected SharedGlTexture(ID3D11ShaderResourceView textureView, long interopHandle, long interopDeviceHandle, String string, TextureFormat textureFormat, int i, int j, int k, int l) {
-        super(string, textureFormat, i, j, k, l);
+    protected SharedGlTexture(
+            ID3D11ShaderResourceView textureView,
+            long interopHandle,
+            long interopDeviceHandle,
+            int usage,
+            String string,
+            TextureFormat textureFormat,
+            int width,
+            int height,
+            int layers,
+            int mipmaps,
+            int texId
+    ) {
+        super(usage, string, textureFormat, width, height, layers, mipmaps, texId);
         this.textureView = textureView;
         this.interopHandle = interopHandle;
         this.interopDeviceHandle = interopDeviceHandle;
