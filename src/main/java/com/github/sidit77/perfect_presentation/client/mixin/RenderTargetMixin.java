@@ -17,33 +17,6 @@ import java.util.function.Supplier;
 @Mixin(RenderTarget.class)
 public class RenderTargetMixin {
 
-    /*
-    @Shadow
-    protected int colorTextureId;
-
-    @WrapOperation(
-            method = "createBuffers(II)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_texImage2D(IIIIIIIILjava/nio/IntBuffer;)V", ordinal = 1)
-    )
-    void createInteropColorBuffer(int target, int level, int internalFormat, int width, int height, int border, int format, int type, IntBuffer data, Operation<Void> original) {
-        if (((RenderTarget)(Object)this) instanceof MainTarget) {
-            InteropContext.getCurrentContext().allocateSharedTexture(this.colorTextureId, target, internalFormat, width, height);
-        } else {
-            original.call(target, level, internalFormat, width, height, border, format, type, data);
-        }
-    }
-
-    @Inject(
-            method = "destroyBuffers()V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/TextureUtil;releaseTextureId(I)V", ordinal = 1)
-    )
-    void destroyInteropColorBuffer(CallbackInfo ci) {
-        if (((RenderTarget)(Object)this) instanceof MainTarget) {
-            InteropContext.getCurrentContext().deallocateSharedTexture(this.colorTextureId);
-        }
-    }
-     */
-
     @WrapOperation(
             method = "createBuffers(II)V",
             at = @At(

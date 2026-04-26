@@ -7,7 +7,6 @@ public class PerfectPresentationClient implements ClientModInitializer {
 
     /*
     TODO:
-        - Context Creation Flags
         - Render resolution scale?
      */
 

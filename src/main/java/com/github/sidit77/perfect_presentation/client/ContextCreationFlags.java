@@ -9,4 +9,8 @@ public class ContextCreationFlags {
     public enum Profile {
         CORE, COMPAT, ANY
     }
+
+    //I'm not sure if volatile is enough to make a gobal safe,
+    // but I'm pretty sure it should only be accessed from a single thread anyway
+    public static volatile ContextCreationFlags CURRENT = new ContextCreationFlags();
 }

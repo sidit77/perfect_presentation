@@ -21,10 +21,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.Supplier;
 
-import static com.mojang.blaze3d.opengl.GlConst.GL_TEXTURE_2D;
-import static com.mojang.blaze3d.opengl.GlConst.GL_TEXTURE_COMPARE_MODE;
-import static org.lwjgl.opengl.GL12.*;
-
 @Mixin(GlDevice.class)
 public class GlDeviceMixin implements GpuDeviceExtensions {
 
@@ -41,7 +37,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     )
     void createInteropContext(long window, Operation<Void> original) {
         var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
-        interopContext = new InteropContext(hwnd, new ContextCreationFlags());
+        interopContext = new InteropContext(hwnd, ContextCreationFlags.CURRENT);
 
         interopContext.makeCurrent();
     }
@@ -58,6 +54,8 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     long patchGetContext(Operation<Long> original) {
         return InteropContext.getCurrentContext() == null ? 0 : 1;
     }
+
+
 
     @Override
     public GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, TextureFormat textureFormat, int i, int j) {

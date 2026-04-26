@@ -1,9 +1,13 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
+import com.github.sidit77.perfect_presentation.client.ContextCreationFlags;
 import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.platform.DisplayData;
+import com.mojang.blaze3d.platform.ScreenManager;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.platform.WindowEventHandler;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,54 +25,36 @@ public abstract class WindowMixin {
     @Final
     private long window;
 
-
-    /*
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwWindowHint(II)V")
     )
     void captureWindowHint(int hint, int value, Operation<Void> original) {
         switch (hint) {
-            case GLFW_CLIENT_API -> glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+            case GLFW_CLIENT_API -> { }
             case GLFW_CONTEXT_CREATION_API -> { }
-            case GLFW_CONTEXT_VERSION_MAJOR -> contextCreationFlags.majorVersion = value;
-            case GLFW_CONTEXT_VERSION_MINOR -> contextCreationFlags.minorVersion = value;
-            case GLFW_OPENGL_PROFILE -> contextCreationFlags.profile = switch (value) {
+            case GLFW_CONTEXT_VERSION_MAJOR -> ContextCreationFlags.CURRENT.majorVersion = value;
+            case GLFW_CONTEXT_VERSION_MINOR -> ContextCreationFlags.CURRENT.minorVersion = value;
+            case GLFW_OPENGL_PROFILE -> ContextCreationFlags.CURRENT.profile = switch (value) {
                 case GLFW_OPENGL_CORE_PROFILE -> ContextCreationFlags.Profile.CORE;
                 case GLFW_OPENGL_COMPAT_PROFILE -> ContextCreationFlags.Profile.COMPAT;
                 case GLFW_OPENGL_ANY_PROFILE -> ContextCreationFlags.Profile.ANY;
                 default -> throw new IllegalArgumentException("Unexpected value: " + value);
             };
-            case GLFW_OPENGL_FORWARD_COMPAT -> contextCreationFlags.forwardCompatible = value != GLFW_FALSE;
-            default -> glfwWindowHint(hint, value);
+            case GLFW_OPENGL_FORWARD_COMPAT -> ContextCreationFlags.CURRENT.forwardCompatible = value != GLFW_FALSE;
         }
+        original.call(hint, value);
     }
-     */
 
 
-    @WrapOperation(
+    @Inject(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwCreateWindow(IILjava/lang/CharSequence;JJ)J")
     )
-    long disableOpenGLContextCreation(int width, int height, CharSequence title, long monitor, long share, Operation<Long> original) {
+    void disableOpenGLContextCreation(WindowEventHandler windowEventHandler, ScreenManager screenManager, DisplayData displayData, String string, String string2, CallbackInfo ci) {
         glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        var window = original.call(width, height, title, 0L, share);
-
-        //var hwnd = GLFWNativeWin32.glfwGetWin32Window(window);
-        //interopContext = new InteropContext(hwnd, contextCreationFlags);
-        return window;
     }
-
-    /*
-    @WrapOperation(
-            method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
-            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
-    )
-    void proxyMakeCurrent(long window, Operation<Void> original) {
-        interopContext.makeCurrent();
-    }
-     */
 
     @WrapOperation(
             method = "updateVsync(Z)V",
@@ -92,13 +78,5 @@ public abstract class WindowMixin {
     void re_enable_window_border(CallbackInfo ci) {
         glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
     }
-
-    /*
-    @Inject(method = "close", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwDestroyWindow(J)V"))
-    void destroyInteropContext(CallbackInfo ci) {
-        interopContext.close();
-    }
-
-     */
 
 }

@@ -2,7 +2,6 @@ package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -28,10 +27,6 @@ public class MinecraftMixin {
     @Final
     private RenderTarget mainRenderTarget;
 
-    //@Shadow
-    //private ProfilerFiller profiler;
-
-
     @Inject(method = "resizeDisplay", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;resize(II)V"))
     void resizeSwapChain(CallbackInfo ci) {
         if (RenderSystem.getDevice() instanceof GpuDeviceExtensions ext) {
@@ -43,31 +38,20 @@ public class MinecraftMixin {
             method = "runTick(Z)V",
             at = @At(value = "CONSTANT", args = "stringValue=render")
     )
-    void waitForSwapChain(boolean bl, CallbackInfo ci, @Local(name = "profilerFiller") ProfilerFiller profiler) {
+    void waitForSwapChain(boolean bl, CallbackInfo ci, @Local ProfilerFiller profilerFiller) {
         if (RenderSystem.getDevice() instanceof GpuDeviceExtensions ext) {
-            profiler.popPush("vsync");
+            profilerFiller.popPush("vsync");
             ext.perfect_presentation$waitForSwapChainSignal();
         }
 
     }
 
-    /*
-    @WrapOperation(
-            method = "runTick(Z)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen(II)V")
-    )
-    void blitWithDirectX(RenderTarget instance, int i, int j, Operation<Void> original) {
-        getInteropContext().blitSharedTextureToSwapChain(instance.getColorTextureId());
-    }
-     */
-
-
     @Inject(
             method = "runTick(Z)V",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/FramerateLimitTracker;getFramerateLimit()I")
     )
-    void improveUpdateDisplayTimings(boolean bl, CallbackInfo ci, @Local(name = "profilerFiller") ProfilerFiller profiler) {
-        profiler.popPush("framerateLimit");
+    void improveUpdateDisplayTimings(boolean bl, CallbackInfo ci, @Local ProfilerFiller profilerFiller) {
+        profilerFiller.popPush("framerateLimit");
     }
 
     @Inject(

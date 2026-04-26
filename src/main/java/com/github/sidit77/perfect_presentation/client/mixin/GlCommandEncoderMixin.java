@@ -29,7 +29,7 @@ public class GlCommandEncoderMixin {
     )
     void presentTexture(GpuTexture gpuTexture, CallbackInfo ci) {
         GpuDeviceExtensions ext = (GpuDeviceExtensions)device;
-        ext.perfect_presentation$blitSharedTextureToSwapChain((SharedGlTexture)gpuTexture);
+        ext.perfect_presentation$blitSharedTextureToSwapChain((SharedGlTexture) gpuTexture);
         ci.cancel();
     }
 
