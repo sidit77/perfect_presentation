@@ -12,14 +12,10 @@ public interface GpuDeviceExtensions {
 
     GpuTexture perfect_presentation$createSharedTexture(@Nullable String string, int usage, TextureFormat textureFormat, int i, int j);
 
-    void perfect_presentation$swapChainPresent();
-
     void perfect_presentation$resizeSwapChain(int i, int j);
 
     void perfect_presentation$waitForSwapChainSignal();
 
     void perfect_presentation$blitSharedTextureToSwapChain(SharedGlTexture texture);
-
-    void perfect_presentation$setSwapInterval(int interval);
 
 }

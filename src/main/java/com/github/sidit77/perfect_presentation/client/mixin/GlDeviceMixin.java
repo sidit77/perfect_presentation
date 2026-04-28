@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.Supplier;
@@ -32,7 +33,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     private GlDebugLabel debugLabels;
 
     @WrapOperation(
-            method = "Lcom/mojang/blaze3d/opengl/GlDevice;<init>(JIZLjava/util/function/BiFunction;Z)V",
+            method = "<init>(JLcom/mojang/blaze3d/shaders/ShaderSource;Lcom/mojang/blaze3d/shaders/GpuDebugOptions;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
     )
     void createInteropContext(long window, Operation<Void> original) {
@@ -55,7 +56,21 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
         return InteropContext.getCurrentContext() == null ? 0 : 1;
     }
 
+    @WrapOperation(
+            method = "setVsync(Z)V",
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapInterval(I)V")
+    )
+    void updateVsync(int interval, Operation<Void> original) {
+        interopContext.setSyncInterval(interval);
+    }
 
+    @Redirect(
+            method = "presentFrame()V",
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapBuffers(J)V")
+    )
+    void presentWithDxgi(long window) {
+        interopContext.swapChainPresent();
+    }
 
     @Override
     public GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, int usage, TextureFormat textureFormat, int i, int j) {
@@ -67,11 +82,6 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
         GlTexture glTexture = interopContext.createSharedTexture(debugName, usage, textureFormat, width, height);
         this.debugLabels.applyLabel(glTexture);
         return glTexture;
-    }
-
-    @Override
-    public void perfect_presentation$swapChainPresent() {
-        interopContext.swapChainPresent();
     }
 
     @Override
@@ -89,8 +99,4 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
         interopContext.blitSharedTextureToSwapChain(texture);
     }
 
-    @Override
-    public void perfect_presentation$setSwapInterval(int interval) {
-        interopContext.setSyncInterval(interval);
-    }
 }
