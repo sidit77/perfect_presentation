@@ -8,7 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import windows.win32.graphics.direct3d11.ID3D11ShaderResourceView;
 
+import java.nio.IntBuffer;
+
 import static org.lwjgl.opengl.WGLNVDXInterop.*;
+import static org.lwjgl.system.windows.WinBase.GetLastError;
 
 public class SharedGlTexture extends GlTexture {
 
@@ -51,7 +54,8 @@ public class SharedGlTexture extends GlTexture {
 
         try(var memStack = MemoryStack.stackPush()) {
             if(!wglDXLockObjectsNV(interopDeviceHandle, memStack.callocPointer(1).put(0, interopHandle))) {
-                WindowsUtil.windowsThrowException("Failed to lock the shared texture");
+                IntBuffer pi = memStack.ints(GetLastError());
+                WindowsUtil.windowsThrowException("Failed to lock the shared texture", pi);
             }
         }
 
@@ -66,7 +70,8 @@ public class SharedGlTexture extends GlTexture {
 
         try(var memStack = MemoryStack.stackPush()) {
             if(!wglDXUnlockObjectsNV(interopDeviceHandle, memStack.callocPointer(1).put(0, interopHandle))) {
-                WindowsUtil.windowsThrowException("Failed to unlock the shared texture");
+                IntBuffer pi = memStack.ints(GetLastError());
+                WindowsUtil.windowsThrowException("Failed to unlock the shared texture", pi);
             }
         }
 
@@ -80,7 +85,10 @@ public class SharedGlTexture extends GlTexture {
                 unlock();
             }
             if(!wglDXUnregisterObjectNV(interopDeviceHandle, interopHandle)) {
-                WindowsUtil.windowsThrowException("Failed to unregister the shared texture");
+                try(var memStack = MemoryStack.stackPush()) {
+                    IntBuffer pi = memStack.ints(GetLastError());
+                    WindowsUtil.windowsThrowException("Failed to unregister the shared texture", pi);
+                }
             }
             textureView.Release();
         }

@@ -3,6 +3,8 @@ package com.github.sidit77.perfect_presentation.client;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.PIXELFORMATDESCRIPTOR;
 
+import java.nio.IntBuffer;
+
 import static org.lwjgl.opengl.WGL.*;
 import static org.lwjgl.opengl.WGLARBCreateContext.*;
 import static org.lwjgl.opengl.WGLARBCreateContextProfile.*;
@@ -22,14 +24,19 @@ public class WGLContext implements AutoCloseable {
 
     public WGLContext(ContextCreationFlags flags) {
         try (MemoryStack stack = stackPush()) {
-            hwnd = check(nCreateWindowEx(
+            IntBuffer pi = stack.mallocInt(1);
+            hwnd = CreateWindowEx(
+                    pi,
                     0,
-                    memAddress(stack.UTF16("STATIC")),
-                    memAddress(stack.UTF16("Hidden Context Window")),
+                    "STATIC",
+                    "Hidden Context Window",
                     WS_POPUP,
                     0, 0, 1, 1,
                     NULL, NULL, NULL, NULL
-            ));
+            );
+            if (hwnd == NULL) {
+                windowsThrowException("Failed to register WGL window", pi);
+            }
 
             hdc = check(GetDC(hwnd));
             PIXELFORMATDESCRIPTOR pfd = PIXELFORMATDESCRIPTOR.calloc(stack)
@@ -42,21 +49,21 @@ public class WGLContext implements AutoCloseable {
                     .cDepthBits((byte) 24)
                     .cStencilBits((byte) 8);
 
-            int pixelFormat = ChoosePixelFormat(hdc, pfd);
+            int pixelFormat = ChoosePixelFormat(pi, hdc, pfd);
             if (pixelFormat == 0) {
-                windowsThrowException("Failed to choose an OpenGL-compatible pixel format");
+                windowsThrowException("Failed to choose an OpenGL-compatible pixel format", pi);
             }
 
-            if (DescribePixelFormat(hdc, pixelFormat, pfd) == 0) {
-                windowsThrowException("Failed to obtain pixel format information");
+            if (DescribePixelFormat(pi, hdc, pixelFormat, pfd) == 0) {
+                windowsThrowException("Failed to obtain pixel format information", pi);
             }
 
-            if (!SetPixelFormat(hdc, pixelFormat, pfd)) {
-                windowsThrowException("Failed to set the pixel format");
+            if (!SetPixelFormat(pi, hdc, pixelFormat, pfd)) {
+                windowsThrowException("Failed to set the pixel format", pi);
             }
 
-            var tempContext = check(wglCreateContext(hdc));
-            wglMakeCurrent(hdc, tempContext);
+            var tempContext = check(wglCreateContext(pi, hdc));
+            wglMakeCurrent(pi, hdc, tempContext);
 
             hglrc = check(wglCreateContextAttribsARB(hdc, 0, new int[] {
                     WGL_CONTEXT_MAJOR_VERSION_ARB, flags.majorVersion,
@@ -70,21 +77,28 @@ public class WGLContext implements AutoCloseable {
                     0
             }));
 
-            wglMakeCurrent(hdc, 0);
-            wglDeleteContext(tempContext);
+            wglMakeCurrent(pi, hdc, 0);
+            wglDeleteContext(pi, tempContext);
         }
 
     }
 
     public void makeCurrent() {
-        wglMakeCurrent(hdc, hglrc);
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer pi = stack.mallocInt(1);
+            wglMakeCurrent(pi, hdc, hglrc);
+        }
     }
 
     @Override
     public void close() {
-        wglMakeCurrent(hdc, 0);
-        wglDeleteContext(hglrc);
-        ReleaseDC(hwnd, hdc);
-        DestroyWindow(hwnd);
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer pi = stack.mallocInt(1);
+            wglMakeCurrent(pi, hdc, 0);
+            wglDeleteContext(pi, hglrc);
+            ReleaseDC(hwnd, hdc);
+            DestroyWindow(pi, hwnd);
+        }
+
     }
 }
