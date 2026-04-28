@@ -22,7 +22,6 @@
     ]
   },
   "mixins": [
-    "perfect_presentation.mixins.json",
     {
       "config": "perfect_presentation.client.mixins.json",
       "environment": "client"
