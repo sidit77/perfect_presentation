@@ -23,7 +23,7 @@ public abstract class WindowMixin {
 
     @Shadow
     @Final
-    private long window;
+    private long handle;
 
     @WrapOperation(
             method = "<init>(Lcom/mojang/blaze3d/platform/WindowEventHandler;Lcom/mojang/blaze3d/platform/ScreenManager;Lcom/mojang/blaze3d/platform/DisplayData;Ljava/lang/String;Ljava/lang/String;)V",
@@ -76,7 +76,7 @@ public abstract class WindowMixin {
 
     @Inject(method = "setMode", at = @At(value = "INVOKE", ordinal = 1, target = "Lorg/lwjgl/glfw/GLFW;glfwSetWindowMonitor(JJIIIII)V"))
     void re_enable_window_border(CallbackInfo ci) {
-        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
+        glfwSetWindowAttrib(handle, GLFW_DECORATED, GLFW_TRUE);
     }
 
 }
