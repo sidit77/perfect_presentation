@@ -1,6 +1,6 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
-import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
+import com.github.sidit77.perfect_presentation.client.PerfectPresentationClient;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.pipeline.MainTarget;
@@ -25,7 +25,8 @@ public class RenderTargetMixin {
             )
     )
     GpuTexture createInteropColorBuffer(GpuDevice instance, Supplier<String> stringSupplier, int u, TextureFormat textureFormat, int w, int h, int l, int m, Operation<GpuTexture> original) {
-        if (((RenderTarget)(Object)this) instanceof MainTarget && (instance instanceof GpuDeviceExtensions ext)) {
+        var ext = PerfectPresentationClient.getBackendExtensions(instance);
+        if (((RenderTarget)(Object)this) instanceof MainTarget && ext != null) {
             return ext.perfect_presentation$createSharedTexture(stringSupplier, u, textureFormat, w, h);
         } else {
             return original.call(instance, stringSupplier, u, textureFormat, w, h, l, m);

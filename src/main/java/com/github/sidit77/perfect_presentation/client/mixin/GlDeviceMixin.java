@@ -1,7 +1,7 @@
 package com.github.sidit77.perfect_presentation.client.mixin;
 
 import com.github.sidit77.perfect_presentation.client.ContextCreationFlags;
-import com.github.sidit77.perfect_presentation.client.GpuDeviceExtensions;
+import com.github.sidit77.perfect_presentation.client.GpuDeviceBackendExtensions;
 import com.github.sidit77.perfect_presentation.client.InteropContext;
 import com.github.sidit77.perfect_presentation.client.SharedGlTexture;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.function.Supplier;
 
 @Mixin(GlDevice.class)
-public class GlDeviceMixin implements GpuDeviceExtensions {
+public class GlDeviceMixin implements GpuDeviceBackendExtensions {
 
     @Unique
     private InteropContext interopContext;

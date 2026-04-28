@@ -4,12 +4,13 @@
   "package": "com.github.sidit77.perfect_presentation.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "GameRendererMixin",
     "GlBackendMixin",
     "GlCommandEncoderMixin",
     "GlDeviceMixin",
+    "GpuDeviceAccessor",
     "MainTargetMixin",
     "MinecraftMixin",
-    "RenderSystemMixin",
     "RenderTargetMixin",
     "WindowMixin"
   ],

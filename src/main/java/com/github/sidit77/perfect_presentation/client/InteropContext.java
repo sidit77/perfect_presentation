@@ -1,11 +1,9 @@
 package com.github.sidit77.perfect_presentation.client;
 
-import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GPU_DEVICE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import windows.win32.foundation.WAIT_EVENT;

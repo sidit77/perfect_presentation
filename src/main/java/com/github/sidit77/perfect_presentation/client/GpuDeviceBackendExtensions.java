@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
-public interface GpuDeviceExtensions {
+public interface GpuDeviceBackendExtensions {
 
     GpuTexture perfect_presentation$createSharedTexture(@Nullable Supplier<String> supplier, int usage, TextureFormat textureFormat, int i, int j);
 
