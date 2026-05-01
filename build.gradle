@@ -157,7 +157,7 @@ ext.baseCoordinates = "${project.name}-${project.version}"
 tasks.register('proguard', ProGuardTask) {
     configuration file('proguard.pro')
 
-    injars(tasks.named('remapJar').flatMap { it.archiveFile })
+    injars(tasks.named('jar').flatMap { it.archiveFile })
 
     libraryjars "${System.getProperty('java.home')}/jmods/java.base.jmod", jarfilter: '!**.jar', filter: '!module-info.class'
 
