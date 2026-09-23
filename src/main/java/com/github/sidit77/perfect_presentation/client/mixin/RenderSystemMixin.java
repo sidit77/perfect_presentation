@@ -16,7 +16,7 @@ public class RenderSystemMixin {
     private static GpuDevice DEVICE;
 
     @WrapOperation(
-            method = "flipFrame(JLcom/mojang/blaze3d/TracyFrameCapture;)V",
+            method = "flipFrame(Lcom/mojang/blaze3d/platform/Window;Lcom/mojang/blaze3d/TracyFrameCapture;)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSwapBuffers(J)V")
     )
     private static void proxySwapBuffers(long window, Operation<Void> original) {

@@ -32,7 +32,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     private GlDebugLabel debugLabels;
 
     @WrapOperation(
-            method = "Lcom/mojang/blaze3d/opengl/GlDevice;<init>(JIZLjava/util/function/BiFunction;Z)V",
+            method = "<init>(JIZLcom/mojang/blaze3d/shaders/ShaderSource;Z)V",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwMakeContextCurrent(J)V")
     )
     void createInteropContext(long window, Operation<Void> original) {
@@ -48,7 +48,7 @@ public class GlDeviceMixin implements GpuDeviceExtensions {
     }
 
     @WrapOperation(
-            method = "Lcom/mojang/blaze3d/opengl/GlDevice;getImplementationInformation()Ljava/lang/String;",
+            method = "getImplementationInformation()Ljava/lang/String;",
             at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwGetCurrentContext()J")
     )
     long patchGetContext(Operation<Long> original) {

@@ -27,7 +27,7 @@ public class GlCommandEncoderMixin {
     private GlDevice device;
 
     @Inject(
-            method = "Lcom/mojang/blaze3d/opengl/GlCommandEncoder;presentTexture(Lcom/mojang/blaze3d/textures/GpuTextureView;)V",
+            method = "presentTexture(Lcom/mojang/blaze3d/textures/GpuTextureView;)V",
             at = @At(
                     value = "INVOKE",
                     target = "Lcom/mojang/blaze3d/opengl/GlStateManager;_disableScissorTest()V"
